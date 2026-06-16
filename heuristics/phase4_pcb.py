@@ -34,7 +34,7 @@ def identify_pcb(input_path: str, phase1_results: dict):
         
         # Valid PCB plate candidates
         # Standard FR4 thickness is 1.6mm. Bounds 1.4 to 2.0 allow CAD tolerances.
-        if 1.4 <= height <= 2.0 and dia > 40.0 and rad_dist < 10.0 and faces > 50:
+        if 1.4 <= height <= 2.0 and dia > 40.0 and rad_dist < 10.0 and faces > 30:
             pcb_nodes.append(i)
             
     return {"PCB_PLATES": pcb_nodes}

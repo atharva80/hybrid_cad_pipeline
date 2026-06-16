@@ -58,17 +58,18 @@ def _find_step_files(directory: str) -> list[str]:
     return sorted(set(files))
 
 
-def _process_single(step_path: str, imgs_dir: str | None, out_dir: str | None):
+def _process_single(step_path: str, imgs_dir: str | None, out_dir: str | None, expect_pcb_box: bool = False):
     """
     Run the full pipeline on one STEP file.
 
     - imgs_dir : if set, save PNG renders here (batch: subfolder per assembly)
     - out_dir  : if set, export {name}_NAMED.step here
+    - expect_pcb_box: if set, force heuristic extraction of the PCB Box
     """
     infer_cad, render_results = _get_engine()
 
     t0     = time.time()
-    result = infer_cad(step_path)
+    result = infer_cad(step_path, expect_pcb_box)
     elapsed = time.time() - t0
     print(f"\n⏱️  Inference completed in {elapsed:.2f}s")
 
@@ -84,7 +85,7 @@ def _process_single(step_path: str, imgs_dir: str | None, out_dir: str | None):
     return elapsed
 
 
-def _batch_mode(batch_dir: str, imgs_root: str | None, out_dir: str | None):
+def _batch_mode(batch_dir: str, imgs_root: str | None, out_dir: str | None, expect_pcb_box: bool = False):
     """
     Find all STEP files under batch_dir and process each one.
     If imgs_root is given, each assembly gets its own subfolder:
@@ -108,7 +109,7 @@ def _batch_mode(batch_dir: str, imgs_root: str | None, out_dir: str | None):
         asm_imgs_dir = os.path.join(imgs_root, basename) if imgs_root else None
 
         try:
-            elapsed = _process_single(fpath, asm_imgs_dir, out_dir)
+            elapsed = _process_single(fpath, asm_imgs_dir, out_dir, expect_pcb_box)
             timing[basename] = elapsed
         except Exception as e:
             print(f"❌  FAILED — {basename}: {e}")
@@ -176,6 +177,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate SHAP feature-importance plots for the trained ML models.",
     )
 
+    # ── Modifiers ──────────────────────────────────────────────────────────
+    parser.add_argument(
+        "--box",
+        action="store_true",
+        default=False,
+        help="Set this flag if the CAD assembly contains a PCB Box/Enclosure to trigger explicit heuristic searching.",
+    )
+
     # ── Output (at least one required when using --in / --batch) ───────────
     output_group = parser.add_argument_group("output options")
     output_group.add_argument(
@@ -221,13 +230,13 @@ def main():
     if args.input_file:
         if not os.path.isfile(args.input_file):
             parser.error(f"File not found: {args.input_file}")
-        _process_single(args.input_file, args.imgs_dir, args.out_dir)
+        _process_single(args.input_file, args.imgs_dir, args.out_dir, args.box)
 
     # ── Batch mode ──────────────────────────────────────────────────────────
     elif args.batch_dir:
         if not os.path.isdir(args.batch_dir):
             parser.error(f"Directory not found: {args.batch_dir}")
-        _batch_mode(args.batch_dir, args.imgs_dir, args.out_dir)
+        _batch_mode(args.batch_dir, args.imgs_dir, args.out_dir, args.box)
 
 
 if __name__ == "__main__":

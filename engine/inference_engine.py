@@ -64,7 +64,7 @@ def _solid_to_pyvista(shape):
                        np.array(faces_pv, dtype=np.int32))
 
 
-def infer_cad(step_file_path: str) -> dict:
+def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     """
     Run the full hybrid heuristic + ML inference pipeline on a STEP file.
 
@@ -189,17 +189,54 @@ def infer_cad(step_file_path: str) -> dict:
     p2 = identify_housing(step_file_path, p1)
     p3 = identify_bearings(step_file_path, p1)
     p4 = identify_pcb(step_file_path, p1)
+    print(f"DEBUG: p4['PCB_PLATES'] = {p4.get('PCB_PLATES')}")
 
     tc_node,    tc_conf    = _resolve_component(p2["TOP_COVER_CANDIDATES"],    6, "TOP_COVER")
     bc_node,    bc_conf    = _resolve_component(p2["BOTTOM_COVER_CANDIDATES"], 7, "BOTTOM_COVER")
     ti_node,    ti_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 3, "TOP_INSULATOR")
     bi_node,    bi_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 4, "BOTTOM_INSULATOR")
     rotor_node, rotor_conf = _resolve_component(p1.get("ROTOR_CANDIDATES", []), 5, "ROTOR_RING")
-
     pcb_nodes  = p4.get("PCB_PLATES", [])
-    if len(pcb_nodes) > 1:
-        # Pick only the largest plate by radial diameter
-        pcb_nodes = [max(pcb_nodes, key=lambda n: max(records[n].features.get("_bbox", [0]*6)[a+3]-records[n].features.get("_bbox", [0]*6)[a] for a in rad_axes))]
+    
+    if expect_pcb_box:
+        # If --box is passed, user expects multiple PCBs. Keep them all.
+        # Sort them by Z-height descending, so the Top PCB is always pcb_nodes[0]
+        if len(pcb_nodes) > 1:
+            pcb_nodes.sort(key=lambda n: ((records[n].features.get("_bbox", [0]*6)[motor_axis] + records[n].features.get("_bbox", [0]*6)[motor_axis+3])/2) * up_vector, reverse=True)
+    else:
+        # Standard behavior: Pick only the largest plate by radial diameter
+        if len(pcb_nodes) > 1:
+            pcb_nodes = [max(pcb_nodes, key=lambda n: max(records[n].features.get("_bbox", [0]*6)[a+3]-records[n].features.get("_bbox", [0]*6)[a] for a in rad_axes))]
+        
+    pcb_box_node = None
+    pb_conf = 0.0
+
+    if expect_pcb_box and pcb_nodes:
+        p_node = pcb_nodes[0]
+        p_bb = records[p_node].features.get("_bbox", [0]*6)
+        p_z = (p_bb[motor_axis] + p_bb[motor_axis+3]) / 2
+        p_thick = max(1.0, p_bb[motor_axis+3] - p_bb[motor_axis])
+        p_dia = max(p_bb[a+3] - p_bb[a] for a in rad_axes)
+
+        assigned_nodes = {stator_node, shaft_node, tc_node, bc_node, ti_node, bi_node, rotor_node}
+        box_cands = []
+        for i, r in enumerate(records):
+            if i == p_node or i in assigned_nodes:
+                continue
+            bb = r.features.get("_bbox")
+            if not bb: continue
+            z = (bb[motor_axis] + bb[motor_axis+3]) / 2
+            dia = max(bb[a+3] - bb[a] for a in rad_axes)
+            
+            # The box must sit very close to the PCB in Z, and be at least 80% as wide
+            if abs(z - p_z) < (p_thick * 10.0) and dia >= (p_dia * 0.8):
+                box_cands.append(i)
+                
+        if box_cands:
+            # Pick the most topologically complex part (molded plastic box vs flat metal ring)
+            pcb_box_node = max(box_cands, key=lambda n: records[n].features.get("face_count", 0))
+            pb_conf = 1.0
+            print(f"  🔍 Heuristic Resolved PCB_BOX: Solid #{pcb_box_node}")
     brg_a_nodes = p3.get("BEARING_A", {}).get("CLUSTER_NODES", [])
     brg_b_nodes = p3.get("BEARING_B", {}).get("CLUSTER_NODES", [])
 
@@ -213,6 +250,7 @@ def infer_cad(step_file_path: str) -> dict:
         ("TOP_INSULATOR",    [ti_node]     if ti_node     else [], ti_conf),
         ("BOTTOM_INSULATOR", [bi_node]     if bi_node     else [], bi_conf),
         ("PCB",              pcb_nodes,                            1.0),
+        ("PCB_BOX",          [pcb_box_node] if pcb_box_node else [], pb_conf),
         ("BEARING_TOP",      brg_a_nodes,                          1.0),
         ("BEARING_BOTTOM",   brg_b_nodes,                          1.0),
     ]
