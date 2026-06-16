@@ -191,11 +191,6 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     p4 = identify_pcb(step_file_path, p1)
     print(f"DEBUG: p4['PCB_PLATES'] = {p4.get('PCB_PLATES')}")
 
-    tc_node,    tc_conf    = _resolve_component(p2["TOP_COVER_CANDIDATES"],    6, "TOP_COVER")
-    bc_node,    bc_conf    = _resolve_component(p2["BOTTOM_COVER_CANDIDATES"], 7, "BOTTOM_COVER")
-    ti_node,    ti_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 3, "TOP_INSULATOR")
-    bi_node,    bi_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 4, "BOTTOM_INSULATOR")
-    rotor_node, rotor_conf = _resolve_component(p1.get("ROTOR_CANDIDATES", []), 5, "ROTOR_RING")
     pcb_nodes  = p4.get("PCB_PLATES", [])
     
     if expect_pcb_box:
@@ -208,6 +203,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         if len(pcb_nodes) > 1:
             pcb_nodes = [max(pcb_nodes, key=lambda n: max(records[n].features.get("_bbox", [0]*6)[a+3]-records[n].features.get("_bbox", [0]*6)[a] for a in rad_axes))]
         
+    # --- 100% Heuristic Resolution (PCB_BOX) ---
     pcb_box_node = None
     pb_conf = 0.0
 
@@ -217,8 +213,11 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         p_z = (p_bb[motor_axis] + p_bb[motor_axis+3]) / 2
         p_thick = max(1.0, p_bb[motor_axis+3] - p_bb[motor_axis])
         p_dia = max(p_bb[a+3] - p_bb[a] for a in rad_axes)
+        
+        st_bb = records[stator_node].features.get("_bbox", [0]*6)
+        st_dia = max(st_bb[a+3] - st_bb[a] for a in rad_axes) if st_bb else 200.0
 
-        assigned_nodes = {stator_node, shaft_node, tc_node, bc_node, ti_node, bi_node, rotor_node}
+        assigned_nodes = {stator_node, shaft_node}
         box_cands = []
         for i, r in enumerate(records):
             if i == p_node or i in assigned_nodes:
@@ -228,15 +227,29 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
             z = (bb[motor_axis] + bb[motor_axis+3]) / 2
             dia = max(bb[a+3] - bb[a] for a in rad_axes)
             
-            # The box must sit very close to the PCB in Z, and be at least 80% as wide
-            if abs(z - p_z) < (p_thick * 10.0) and dia >= (p_dia * 0.8):
+            if abs(z - p_z) < (p_thick * 10.0) and (p_dia * 0.8) <= dia <= (st_dia * 1.5):
                 box_cands.append(i)
                 
         if box_cands:
-            # Pick the most topologically complex part (molded plastic box vs flat metal ring)
             pcb_box_node = max(box_cands, key=lambda n: records[n].features.get("face_count", 0))
             pb_conf = 1.0
             print(f"  🔍 Heuristic Resolved PCB_BOX: Solid #{pcb_box_node}")
+
+    # Exclude 100% known heuristics from ML candidate pools
+    if pcb_box_node is not None:
+        p2["TOP_COVER_CANDIDATES"] = [c for c in p2.get("TOP_COVER_CANDIDATES", []) if c != pcb_box_node]
+        p2["BOTTOM_COVER_CANDIDATES"] = [c for c in p2.get("BOTTOM_COVER_CANDIDATES", []) if c != pcb_box_node]
+        if "INSULATOR_CANDIDATES" in p1:
+            p1["INSULATOR_CANDIDATES"] = [c for c in p1["INSULATOR_CANDIDATES"] if c != pcb_box_node]
+        if "ROTOR_CANDIDATES" in p1:
+            p1["ROTOR_CANDIDATES"] = [c for c in p1["ROTOR_CANDIDATES"] if c != pcb_box_node]
+
+    # --- ML Fallback Resolution ---
+    tc_node,    tc_conf    = _resolve_component(p2.get("TOP_COVER_CANDIDATES", []),    6, "TOP_COVER")
+    bc_node,    bc_conf    = _resolve_component(p2.get("BOTTOM_COVER_CANDIDATES", []), 7, "BOTTOM_COVER")
+    ti_node,    ti_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 3, "TOP_INSULATOR")
+    bi_node,    bi_conf    = _resolve_component(p1.get("INSULATOR_CANDIDATES", []), 4, "BOTTOM_INSULATOR")
+    rotor_node, rotor_conf = _resolve_component(p1.get("ROTOR_CANDIDATES", []), 5, "ROTOR_RING")
     brg_a_nodes = p3.get("BEARING_A", {}).get("CLUSTER_NODES", [])
     brg_b_nodes = p3.get("BEARING_B", {}).get("CLUSTER_NODES", [])
 

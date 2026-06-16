@@ -31,3 +31,5 @@ venv.bak/
 .DS_Store
 *.STEP
 *.step
+./CAD/test_imgs
+./CAD/UNSEEN
