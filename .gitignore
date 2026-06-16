@@ -29,7 +29,9 @@ venv.bak/
 .vscode/
 *.swp
 .DS_Store
-*.STEP
-*.step
-./CAD/test_imgs
-./CAD/UNSEEN
+# *.STEP
+# *.step
+
+# Ignore everything in CAD except test_imgs
+CAD/*
+!CAD/test_imgs/
