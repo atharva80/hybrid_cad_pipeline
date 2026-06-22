@@ -35,3 +35,5 @@ venv.bak/
 # Ignore everything in CAD except test_imgs
 CAD/*
 !CAD/test_imgs/
+
+test

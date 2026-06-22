@@ -25,6 +25,8 @@ from heuristics.phase1_anchors import identify_anchors
 from heuristics.phase2_housing import identify_housing
 from heuristics.phase3_bearings import identify_bearings
 from heuristics.phase4_pcb import identify_pcb
+from heuristics.phase5_EPS_motorbox import identify_eps
+from heuristics.phase6_Canopies_false_pos import identify_canopies
 
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.TopExp import TopExp_Explorer
@@ -135,6 +137,17 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     st_thick   = st_bb[motor_axis+3] - st_bb[motor_axis]
     up_vector  = p1.get("UP_VECTOR", 1)
 
+    # ── Phase 5: EPS Packaging Identification ──────────────────────────────
+    eps_nodes = identify_eps(records, stator_node, motor_axis)
+    if eps_nodes:
+        print(f"  📦 Found {len(eps_nodes)} EPS Packaging blocks. Stripping from candidate pools.")
+        shaft_cands = [c for c in shaft_cands if c not in eps_nodes]
+        p1["SHAFT_CANDIDATES"] = shaft_cands
+        if "INSULATOR_CANDIDATES" in p1:
+            p1["INSULATOR_CANDIDATES"] = [c for c in p1["INSULATOR_CANDIDATES"] if c not in eps_nodes]
+        if "ROTOR_CANDIDATES" in p1:
+            p1["ROTOR_CANDIDATES"] = [c for c in p1["ROTOR_CANDIDATES"] if c not in eps_nodes]
+
     # ── Stage 2 ML: Component Resolver ─────────────────────────────────────
     xgb_comp = xgb.XGBClassifier()
     xgb_comp.load_model(os.path.join(_MODELS_DIR, "xgboost_model.json"))
@@ -142,8 +155,11 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     def _resolve_component(cands, target_class_idx, name_str):
         if len(cands) == 1:
             return cands[0], 1.0
+        
+        # Remove EPS from fallback evaluation pool
         eval_nodes = cands if len(cands) > 0 else [
-            i for i, r in enumerate(records) if r.features.get("volume_mm3", 0) > 50
+            i for i, r in enumerate(records) 
+            if r.features.get("volume_mm3", 0) > 50 and i not in eps_nodes
         ]
         rows = []
         for i in eval_nodes:
@@ -253,6 +269,29 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     brg_a_nodes = p3.get("BEARING_A", {}).get("CLUSTER_NODES", [])
     brg_b_nodes = p3.get("BEARING_B", {}).get("CLUSTER_NODES", [])
 
+    # Strip EPS from housing pools
+    if eps_nodes:
+        p2["TOP_COVER_CANDIDATES"] = [c for c in p2.get("TOP_COVER_CANDIDATES", []) if c not in eps_nodes]
+        p2["BOTTOM_COVER_CANDIDATES"] = [c for c in p2.get("BOTTOM_COVER_CANDIDATES", []) if c not in eps_nodes]
+
+    # --- Phase 6: Canopy Trap ---
+    # Collect all claimed nodes across the entire assembly
+    claimed_nodes = set()
+    claimed_nodes.update([stator_node, shaft_node, rotor_node, tc_node, bc_node, ti_node, bi_node, pcb_box_node])
+    claimed_nodes.update(pcb_nodes)
+    claimed_nodes.update(brg_a_nodes)
+    claimed_nodes.update(brg_b_nodes)
+    claimed_nodes.update(eps_nodes)
+    # Remove None values
+    claimed_nodes.discard(None)
+    
+    canopy_anchors = {
+        "STATOR_NODE": stator_node,
+        "SHAFT_NODE": shaft_node,
+        "MOTOR_AXIS": p1.get("MOTOR_AXIS", 2)
+    }
+    canopy_nodes = identify_canopies(records, canopy_anchors, claimed_nodes)
+
     # ── Final Results ───────────────────────────────────────────────────────
     results = [
         ("STATOR",           [stator_node],                       st_conf),
@@ -266,7 +305,11 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         ("PCB_BOX",          [pcb_box_node] if pcb_box_node else [], pb_conf),
         ("BEARING_TOP",      brg_a_nodes,                          1.0),
         ("BEARING_BOTTOM",   brg_b_nodes,                          1.0),
+        ("EPS_PACKAGING",    eps_nodes,                            1.0),
     ]
+
+    for i, c_node in enumerate(canopy_nodes):
+        results.append((f"CANOPY_{i}", [c_node], 1.0))
 
     print("\n=============================================")
     print("🏆 INFERENCE RESULTS")
@@ -315,5 +358,6 @@ def render_results(inference_output: dict, out_dir: str, cad_basename: str):
                 plotter.screenshot(img_path)
                 plotter.close()
                 print(f"  Saved {comp} → {img_path}")
+                import time; time.sleep(0.05)  # Yield GIL to keep UI responsive
         except Exception as e:
             print(f"  ❌ Failed to render {comp}: {e}")

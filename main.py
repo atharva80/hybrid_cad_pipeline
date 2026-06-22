@@ -156,19 +156,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # ── Input (mutually exclusive — must pick one) ──────────────────────────
-    input_group = parser.add_mutually_exclusive_group(required=True)
+    # ── Input Options ────────────────────────────────────────────────────────
+    input_group = parser.add_argument_group("input options")
     input_group.add_argument(
         "--in",
-        dest="input_file",
-        metavar="FILE.step",
-        help="Run pipeline on a single STEP file.",
+        dest="input_path",
+        metavar="PATH",
+        required=True,
+        help="Path to a single STEP file, or a directory (when used with --batch).",
     )
     input_group.add_argument(
         "--batch",
-        dest="batch_dir",
-        metavar="DIR",
-        help="Run pipeline on ALL STEP files found recursively inside DIR.",
+        action="store_true",
+        default=False,
+        help="Run pipeline on ALL STEP files found recursively inside the --in directory.",
     )
     input_group.add_argument(
         "--explain",
@@ -185,7 +186,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Set this flag if the CAD assembly contains a PCB Box/Enclosure to trigger explicit heuristic searching.",
     )
 
-    # ── Output (at least one required when using --in / --batch) ───────────
+    # ── Output (at least one required) ─────────────────────────────────────
     output_group = parser.add_argument_group("output options")
     output_group.add_argument(
         "--imgs",
@@ -226,17 +227,17 @@ def main():
     if args.imgs_dir is None and args.out_dir is None:
         parser.error("At least one output flag is required: --imgs DIR  and/or  --out DIR")
 
-    # ── Single file mode ────────────────────────────────────────────────────
-    if args.input_file:
-        if not os.path.isfile(args.input_file):
-            parser.error(f"File not found: {args.input_file}")
-        _process_single(args.input_file, args.imgs_dir, args.out_dir, args.box)
-
     # ── Batch mode ──────────────────────────────────────────────────────────
-    elif args.batch_dir:
-        if not os.path.isdir(args.batch_dir):
-            parser.error(f"Directory not found: {args.batch_dir}")
-        _batch_mode(args.batch_dir, args.imgs_dir, args.out_dir, args.box)
+    if args.batch:
+        if not os.path.isdir(args.input_path):
+            parser.error(f"Directory not found for batch processing: {args.input_path}")
+        _batch_mode(args.input_path, args.imgs_dir, args.out_dir, args.box)
+
+    # ── Single file mode ────────────────────────────────────────────────────
+    else:
+        if not os.path.isfile(args.input_path):
+            parser.error(f"File not found: {args.input_path}")
+        _process_single(args.input_path, args.imgs_dir, args.out_dir, args.box)
 
 
 if __name__ == "__main__":

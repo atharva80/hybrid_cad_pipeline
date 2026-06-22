@@ -1,6 +1,6 @@
 # Hybrid CAD Parsing Pipeline
 
-This directory contains the inference engine for the Hybrid CAD Parsing Pipeline. It processes unlabelled CAD assemblies (.STEP format), isolates the Stator and Shaft using geometric heuristics, and applies an XGBoost model to classify surrounding components (Covers, Rotors, Bearings, PCBs, etc.).
+This directory contains the inference engine for the Hybrid CAD Parsing Pipeline. It processes unlabelled CAD assemblies (.STEP format), isolates the Stator and Shaft using geometric heuristics, and applies an XGBoost model to classify surrounding components (Covers, Rotors, Bearings, PCBs, EPS Packaging, Canopies, etc.).
 
 Outputs:
 1. **Rendered PNGs**: A 3D render of each identified component.
@@ -34,7 +34,7 @@ conda activate cv_datagen
 
 ## Usage
 
-The `main.py` script serves as the primary entry point. It requires one input argument (`--in` or `--batch`) and at least one output argument (`--imgs` or `--out`).
+The `main.py` script serves as the primary entry point. It requires one input path (`--in`) and at least one output argument (`--imgs` or `--out`).
 
 ### 1. Process a Single File
 Run the pipeline on a single STEP file, generate PNG renders, and export the labeled STEP file:
@@ -43,19 +43,25 @@ python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders --out .\outp
 ```
 
 ### 2. Process a Directory (Batch Mode)
-Run the pipeline on all STEP files within a specified directory.
-Note: When using `--imgs` in batch mode, renders are grouped into sub-folders named after each assembly.
+Run the pipeline on all STEP files within a specified directory by adding the `--batch` flag.
+Note: When using `--imgs` in batch mode, renders are grouped into sub-folders automatically named after each assembly.
 ```cmd
-python main.py --batch "C:\path\to\CAD_Folder" --imgs .\output_renders --out .\output_cads
+python main.py --batch --in "C:\path\to\CAD_Folder" --imgs .\output_renders --out .\output_cads
 ```
 
-### 3. Generate Images Only
+### 3. Target the PCB Box
+If the CAD model contains a secondary enclosing top PCB box, use the `--box` modifier flag to trigger explicit heuristic searching for it:
+```cmd
+python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders --box
+```
+
+### 4. Generate Images Only
 Process a file and output only visual renders without exporting a new STEP file:
 ```cmd
 python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders
 ```
 
-### 4. Explainability / Debugging
+### 5. Explainability / Debugging
 To debug misclassifications or analyze feature importance, generate SHAP plots for the trained models:
 ```cmd
 python main.py --explain
@@ -67,6 +73,6 @@ python main.py --explain
 *   `main.py` — Primary CLI script.
 *   `environment.yml` — Conda environment and dependency configurations.
 *   `core/` — OpenCASCADE topology extractors (`step_loader.py`).
-*   `heuristics/` — Mathematical rule sets for filtering component candidates (Phases 1-4).
+*   `heuristics/` — Mathematical rule sets for filtering component candidates (Phases 1-6).
 *   `engine/` — Inference logic (`inference_engine.py`) and CAD export/flattening tools (`step_exporter.py`).
 *   `models/` — Trained XGBoost model weights (.json files).
