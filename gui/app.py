@@ -3,6 +3,7 @@ import sys
 import glob
 import json
 import time
+import shutil
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _ROOT not in sys.path: sys.path.insert(0, _ROOT)
 
@@ -120,12 +121,14 @@ class ImportPage(QWidget):
         self.chk_batch  = QCheckBox("Batch process directory")
         self.chk_box    = QCheckBox("Detect PCB enclosures")
         self.chk_render = QCheckBox("Generate renders"); self.chk_render.setChecked(True)
+        self.chk_export_direct = QCheckBox("Export renders directly"); self.chk_export_direct.setChecked(False)
         self.chk_export = QCheckBox("Export labeled parts")
         
         chk_grid.addWidget(self.chk_batch, 0, 0)
         chk_grid.addWidget(self.chk_box, 0, 1)
         chk_grid.addWidget(self.chk_render, 1, 0)
-        chk_grid.addWidget(self.chk_export, 1, 1)
+        chk_grid.addWidget(self.chk_export_direct, 1, 1)
+        chk_grid.addWidget(self.chk_export, 2, 0)
         cl.addLayout(chk_grid)
         
         self.chk_batch.stateChanged.connect(lambda s: self.drop.set_batch(bool(s)))
@@ -149,8 +152,12 @@ class ImportPage(QWidget):
         el.addWidget(e_lbl); el.addWidget(self.export_edit, 1); el.addWidget(e_btn)
         cl.addWidget(self.export_out_w)
 
+        self.render_out_w.setVisible(False)
         self.export_out_w.setVisible(False)
-        self.chk_render.stateChanged.connect(lambda s: self.render_out_w.setVisible(bool(s)))
+        
+        self.chk_export_direct.stateChanged.connect(lambda s: self.render_out_w.setVisible(bool(s) and self.chk_render.isChecked()))
+        self.chk_render.stateChanged.connect(lambda s: self.render_out_w.setVisible(bool(s) and self.chk_export_direct.isChecked()))
+        self.chk_render.stateChanged.connect(lambda s: self.chk_export_direct.setEnabled(bool(s)))
         self.chk_export.stateChanged.connect(lambda s: self.export_out_w.setVisible(bool(s)))
 
         fl.addWidget(card)
@@ -159,7 +166,8 @@ class ImportPage(QWidget):
     def get_config(self):
         return {
             "in_path": self.drop.get_path(),
-            "render_dir": self.render_edit.text().strip() if self.chk_render.isChecked() else None,
+            "render_dir": self.render_edit.text().strip() if self.chk_export_direct.isChecked() else None,
+            "export_direct": self.chk_export_direct.isChecked(),
             "export_dir": self.export_edit.text().strip() if self.chk_export.isChecked() else None,
             "batch": self.chk_batch.isChecked(),
             "box": self.chk_box.isChecked(),
@@ -322,7 +330,16 @@ class RendersPage(QWidget):
 
         self.file_lbl = QLabel("—")
         self.file_lbl.setFont(QFont("Inter", 20, QFont.Bold))
-        layout.addWidget(self.file_lbl)
+        
+        self.export_btn = QPushButton("Export Renders"); self.export_btn.setObjectName("ghost_btn")
+        self.export_btn.clicked.connect(self._export_all)
+        
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(self.file_lbl)
+        header_layout.addStretch()
+        header_layout.addWidget(self.export_btn)
+        
+        layout.addLayout(header_layout)
 
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         container = QWidget(); self.grid = QGridLayout(container)
@@ -371,6 +388,37 @@ class RendersPage(QWidget):
         self.sidebar.clear()
         self._clear_grid()
         self.file_lbl.setText("—")
+
+    def _export_all(self):
+        if not self._data_map: return
+        dest = QFileDialog.getExistingDirectory(self, "Export Renders", _ROOT)
+        if not dest: return
+        
+        old_cache_dirs = set()
+        for filename, renders in self._data_map.items():
+            for i, (comp_name, img_path) in enumerate(renders):
+                if os.path.exists(img_path):
+                    target_path = os.path.join(dest, os.path.basename(img_path))
+                    try:
+                        shutil.move(img_path, target_path)
+                        renders[i] = (comp_name, target_path)
+                        if "_cache" in img_path:
+                            old_cache_dirs.add(os.path.dirname(os.path.dirname(img_path)))
+                    except Exception as e: print(f"Export err: {e}")
+
+        win = self.window()
+        if hasattr(win, 'current_report_path') and win.current_report_path and os.path.exists(win.current_report_path):
+            try:
+                with open(win.current_report_path, "r") as f: report = json.load(f)
+                report["renders"] = self._data_map
+                with open(win.current_report_path, "w") as f: json.dump(report, f, indent=2)
+            except Exception as e: print(f"Error updating report: {e}")
+            
+        for d in old_cache_dirs:
+            shutil.rmtree(d, ignore_errors=True)
+            
+        row = self.sidebar.currentRow()
+        if row >= 0: self._on_row_changed(row)
 
     def _clear_grid(self):
         for t in self._thumbs: self.grid.removeWidget(t); t.deleteLater()
@@ -475,6 +523,8 @@ class App(QMainWindow):
         self.resize(1200, 800)
         self.setMinimumSize(900, 600)
         self._worker = None
+        self.current_report_path = None
+        self._clean_cache()
 
         central = QWidget(); self.setCentralWidget(central)
         root = QVBoxLayout(central); root.setContentsMargins(0,0,0,0); root.setSpacing(0)
@@ -539,11 +589,38 @@ class App(QMainWindow):
         self._pages_w.setCurrentIndex(idx)
         for i, btn in enumerate(self._nav_btns): btn.set_active(i == idx)
 
+    def _clean_cache(self):
+        valid_dirs = set()
+        history_dir = os.path.join(_ROOT, "_run_history")
+        if os.path.exists(history_dir):
+            for f in glob.glob(os.path.join(history_dir, "*.json")):
+                try:
+                    with open(f, "r") as fh: report = json.load(fh)
+                    for renders in report.get("renders", {}).values():
+                        for _, img_path in renders:
+                            if "_cache" in img_path:
+                                valid_dirs.add(os.path.dirname(os.path.dirname(img_path)))
+                except: pass
+                
+        cache_dir = os.path.join(_ROOT, "_cache", "renders")
+        if os.path.exists(cache_dir):
+            for d in os.listdir(cache_dir):
+                dir_path = os.path.join(cache_dir, d)
+                if dir_path not in valid_dirs:
+                    shutil.rmtree(dir_path, ignore_errors=True)
+
     def _run(self):
         cfg = self.import_page.get_config()
         if not cfg["in_path"]: return
-        if cfg["do_render"] and not cfg["render_dir"]: return
+        if cfg["do_render"] and cfg["export_direct"] and not cfg["render_dir"]: return
         if cfg["do_export"] and not cfg["export_dir"]: return
+
+        self._clean_cache()
+        self.current_report_path = None
+        r_dir = cfg["render_dir"]
+        if cfg["do_render"] and not cfg["export_direct"]:
+            r_dir = os.path.join(_ROOT, "_cache", "renders", time.strftime("%Y%m%d_%H%M%S"))
+            os.makedirs(r_dir, exist_ok=True)
 
         self.results_page.clear()
         self.renders_page.clear()
@@ -553,7 +630,7 @@ class App(QMainWindow):
 
         self._worker = InferenceWorker(
             step_path=cfg["in_path"], 
-            render_dir=cfg["render_dir"],
+            render_dir=r_dir,
             export_dir=cfg["export_dir"],
             batch=cfg["batch"], 
             box=cfg["box"], 
@@ -604,8 +681,10 @@ class App(QMainWindow):
                 "results": self.results_page._data_map,
                 "renders": self.renders_page._data_map
             }
-            with open(os.path.join(history_dir, f"{name.strip()}.json"), "w") as f:
+            report_path = os.path.join(history_dir, f"{name.strip()}.json")
+            with open(report_path, "w") as f:
                 json.dump(report, f, indent=2)
+            self.current_report_path = report_path
             self.progress_lbl.setText("Saved successfully")
         except Exception as e:
             self.progress_lbl.setText(f"Save failed: {e}")
@@ -617,6 +696,7 @@ class App(QMainWindow):
         
         self.results_page.clear()
         self.renders_page.clear()
+        self.current_report_path = d.selected_report
         
         try:
             with open(d.selected_report, "r") as f:
