@@ -247,17 +247,7 @@ class ResultsPage(QWidget):
             item = self.topo_layout.takeAt(0)
             if item and item.widget(): item.widget().deleteLater()
 
-        tags = []
         comp_map = {c: n for c, n, _ in results}
-        if comp_map.get("PCB_BOX"): tags.append(("External Controller", C['text']))
-        elif comp_map.get("PCB"): tags.append(("Integrated PCB", C['text_dim']))
-        if any(k.startswith("CANOPY") for k, v, _ in results if v): tags.append(("Canopy Found", C['text']))
-        if comp_map.get("EPS_PACKAGING"): tags.append(("Shipping Block", C['text_dim']))
-
-        for text, color in tags:
-            lbl = QLabel(text)
-            lbl.setStyleSheet(f"color: {color}; background: {C['surface']}; border: 1px solid {C['border']}; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 500;")
-            self.topo_layout.addWidget(lbl)
 
         for comp, nodes, conf in results:
             if not nodes: continue
