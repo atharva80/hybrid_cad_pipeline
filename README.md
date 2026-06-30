@@ -20,7 +20,7 @@ Open the Anaconda Prompt, navigate to the project directory, and create the envi
 
 ```cmd
 cd path\to\hybrid_cad_pipeline
-conda env create -f environment.yml
+conda env create -f config/environment.yml
 ```
 This process downloads OpenCASCADE, PyVista, XGBoost, and other required packages.
 
@@ -71,7 +71,7 @@ python main.py --explain
 
 ## Directory Structure
 *   `main.py` — Primary CLI script.
-*   `environment.yml` — Conda environment and dependency configurations.
+*   `config/environment.yml` — Conda environment and dependency configurations.
 *   `core/` — OpenCASCADE topology extractors (`step_loader.py`).
 *   `heuristics/` — Mathematical rule sets for filtering component candidates (Phases 1-6).
 *   `engine/` — Inference logic (`inference_engine.py`) and CAD export/flattening tools (`step_exporter.py`).

@@ -7,8 +7,10 @@ relative to the Phase 1 anchors.
 """
 
 import numpy as np
+from core.config import load_heuristics_config
 
 def identify_bearings(input_path: str, phase1_results: dict):
+    cfg = load_heuristics_config()["phase3_bearings"]
     records = phase1_results['RECORDS']
     motor_axis = phase1_results['MOTOR_AXIS']
     rad_axes = [a for a in range(3) if a != motor_axis]
@@ -38,7 +40,7 @@ def identify_bearings(input_path: str, phase1_results: dict):
         faces = r.features.get('face_count', 0)
         
         # Valid bearing race candidates (Scale Invariant)
-        if rad_dist < 2.0 and dia < sh_dia * 3.0 and faces < 50 and height > 1.5:
+        if rad_dist < cfg["rad_dist_max"] and dia < sh_dia * cfg["dia_max_mult"] and faces < cfg["faces_max"] and height > cfg["height_min"]:
             z = (bb[motor_axis] + bb[motor_axis+3]) / 2
             cands.append({'node': i, 'z': z})
             
@@ -47,7 +49,7 @@ def identify_bearings(input_path: str, phase1_results: dict):
     for c in cands:
         added = False
         for cl in clusters:
-            if abs(cl['z_center'] - c['z']) < 6.0:
+            if abs(cl['z_center'] - c['z']) < cfg["z_center_tolerance"]:
                 cl['nodes'].append(c['node'])
                 # Do NOT dynamically update z_center, to prevent cluster drifting
                 added = True
@@ -55,8 +57,8 @@ def identify_bearings(input_path: str, phase1_results: dict):
         if not added:
             clusters.append({'z_center': c['z'], 'nodes': [c['node']]})
             
-    # Valid clusters must have at least 2 components (Inner + Outer race)
-    bearing_clusters = [cl for cl in clusters if len(cl['nodes']) >= 2]
+    # Valid clusters must have at least N components (Inner + Outer race usually)
+    bearing_clusters = [cl for cl in clusters if len(cl['nodes']) >= cfg["cluster_min_nodes"]]
     
     # Sort by distance to the stator center to pick the motor bearings (avoids shackle bearings)
     bearing_clusters.sort(key=lambda cl: abs(cl['z_center'] - st_center_z))

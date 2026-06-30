@@ -43,7 +43,8 @@ def export_named_step(inference_output: dict, out_dir: str, original_step_path: 
 
     # Build mapping of node_idx -> Component Name
     assigned: dict[int, str] = {}
-    for comp, nodes, _ in results:
+    for res in results:
+        comp, nodes = res[0], res[1]
         counts: dict[str, int] = {}
         for node in nodes:
             if node is None or node in assigned:
@@ -67,7 +68,7 @@ def export_named_step(inference_output: dict, out_dir: str, original_step_path: 
 
     from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
 
-    print(f"\n  🔨 Flattening {len(records)} solids into new assembly...")
+    print(f"\n   Flattening {len(records)} solids into new assembly...")
     for r in records:
         copied_shape = BRepBuilderAPI_Copy(r.shape).Shape()
         builder.Add(comp, copied_shape)
@@ -87,7 +88,7 @@ def export_named_step(inference_output: dict, out_dir: str, original_step_path: 
         
         if node_idx in assigned:
             name = assigned[node_idx]
-            print(f"  ✏️  Solid #{node_idx} → {name}")
+            print(f"    Solid #{node_idx} → {name}")
         else:
             name = f"Solid_{node_idx}"
 
@@ -106,13 +107,13 @@ def export_named_step(inference_output: dict, out_dir: str, original_step_path: 
 
     ok = writer.Transfer(new_doc)
     if not ok:
-        print("  ❌ STEPCAFControl_Writer.Transfer failed")
+        print("   STEPCAFControl_Writer.Transfer failed")
         return ""
 
     status = writer.Write(output_path)
     if status == IFSelect_RetDone:
-        print(f"  ✅ Exported Flattened NAMED STEP → {output_path}")
+        print(f"   Exported Flattened NAMED STEP → {output_path}")
     else:
-        print(f"  ❌ STEP export failed (status code: {status})")
+        print(f"   STEP export failed (status code: {status})")
 
     return output_path

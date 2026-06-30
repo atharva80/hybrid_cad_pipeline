@@ -1,0 +1,83 @@
+# ATLAS Pipeline Heuristics Configuration
+# ---------------------------------------
+# You can tweak these magic numbers on the fly. The pipeline reloads this file on every run.
+# To disable a filter entirely, set its min value to 0 or max value to an extreme (e.g. 99999).
+
+phase1_anchors:
+  # General pre-filtering
+  # Rejects absolutely tiny CAD artifacts (screws, pins) before processing
+  global_min_vol: 50
+  
+  # Stator constraints
+  # The stator is the core anchor. It must be a large metal cylinder.
+  stator_min_vol: 3000         # Minimum absolute volume in mm^3
+  stator_dia_min: 80.0          # Minimum outer diameter of the stator stack
+  stator_dia_max: 120.0         # Maximum outer diameter of the stator stack
+  stator_thick_min: 8.0         # Minimum Z-height (thickness) of the stator stack
+  stator_thick_max: 35.0        # Maximum Z-height of the stator stack
+  stator_aspect_max: 0.35       # Ratio of thickness to diameter (must be a flat disk, not a tall tube)
+  stator_complex_faces: 100     # Resolves tiebreakers: stators have many complex winding slots
+
+  # Shaft constraints
+  # The shaft must be a long, narrow cylinder extending from the center of the stator.
+  shaft_len_min: 40.0           # Minimum length of the shaft (excludes thin washers)
+  shaft_len_max: 180.0          # Maximum length of the shaft (excludes long downrods)
+  shaft_dia_max: 30.0           # Maximum diameter of the shaft
+  shaft_rad_dist_max: 5.0       # Maximum distance from the true center of the stator
+  
+  # Rotor inner ring constraints (close to shaft)
+  # Some rotors are modeled as internal rings hugging the shaft.
+  rotor_inner_len_min: 30.0     # Minimum length to be considered a rotor ring
+  rotor_inner_dia_max: 60.0     # Maximum diameter for the inner rotor section
+  rotor_inner_rad_dist_max: 5.0 # Must be perfectly centered on the motor axis
+  
+  # Rotor outer ring constraints (close to stator)
+  # Standard rotors wrap around the outside of the stator.
+  rotor_outer_dia_tolerance: 15.0 # Max difference between stator diameter and rotor diameter
+  rotor_outer_face_min: 400       # Rotors often have many faces due to magnet slots
+  rotor_outer_vol_max: 15000.0    # Prevents classifying the massive outer housing as the rotor
+  
+  # Rotor alternative constraints (outer shell)
+  # Backup constraints if the rotor is modeled as a hollow metal band.
+  rotor_alt_rad_dist_max: 5.0        # Must be centered
+  rotor_alt_dia_min_offset: 1.0      # Rotor must be slightly wider than stator
+  rotor_alt_dia_max_offset: 30.0     # Rotor shouldn't be massively wider than stator
+  rotor_alt_aspect_max: 0.6          # Aspect ratio (thickness / diameter) limit
+  rotor_alt_thick_tolerance: 10.0    # Rotor thickness should match stator thickness closely
+  rotor_alt_vol_min: 5000.0          # Must be a substantial metal piece (filters out tiny magnets)
+
+phase2_housing:
+  # Housing / Motor Covers sit directly above or below the stator
+  rad_dist_max: 20.0        # Center alignment tolerance
+  dia_min_offset: -5.0      # Can be slightly narrower than stator
+  dia_max_offset: 120.0     # Can be much wider than stator (some covers flare out)
+  face_count_min: 150       # Housings are complex curved surfaces (filters out flat brackets)
+
+phase3_bearings:
+  # Bearings sit tightly on the shaft
+  rad_dist_max: 2.0         # Must be perfectly aligned with the shaft axis
+  dia_max_mult: 3.0         # Max diameter relative to the shaft diameter (bearings aren't huge)
+  faces_max: 50             # Bearings are usually modeled as simple smooth toruses in CAD
+  height_min: 1.5           # Minimum thickness of a bearing race
+  z_center_tolerance: 6.0   # How close the Inner/Outer races must be in Z to be considered one bearing
+  cluster_min_nodes: 2      # A valid bearing must have at least an Inner and Outer race modeled
+
+phase4_pcb:
+  # Internal PCB controller plate
+  height_min: 1.4           # Standard FR4 thickness lower bound
+  height_max: 2.0           # Standard FR4 thickness upper bound
+  dia_min: 40.0             # Must be a wide circular plate
+  rad_dist_max: 10.0        # Must be relatively centered in the motor
+  faces_min: 30             # PCB CAD usually has holes/cutouts leading to higher face counts
+
+phase5_eps:
+  # EPS Packaging blocks (Thermocol)
+  vol_mult_min: 1.5         # Must have a volume 1.5x larger than the massive stator core
+  dia_mult_min: 1.5         # Must have an outer diameter 1.5x larger than the stator
+  fill_ratio_min: 0.25      # (Volume / Bounding Box Volume) -> Must be a dense block, not a thin shell
+
+phase6_canopies:
+  # Cosmetic covers that slide down the downrod (now acts as Foolproof Catch-All for all hollow shells including boxes/staycaps)
+  fill_ratio_min: 0.40      # Relaxed to 0.40 to catch denser motor boxes and packaging
+  aspect_ratio_max: 0.10    # Relaxed to 0.10 to catch extremely flat staycaps and thin plates
+  dia_min: 40.0             # Minimum diameter (filters out tiny collars/screws)

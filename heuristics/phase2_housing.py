@@ -6,8 +6,10 @@ Identifies the TOP_COVER housing relative to the Phase 1 anchors.
 """
 
 import numpy as np
+from core.config import load_heuristics_config
 
 def identify_housing(input_path: str, phase1_results: dict):
+    cfg = load_heuristics_config()["phase2_housing"]
     records = phase1_results['RECORDS']
     # Removed old single node lookups since Phase 1 now returns lists
     motor_axis = phase1_results['MOTOR_AXIS']
@@ -46,9 +48,9 @@ def identify_housing(input_path: str, phase1_results: dict):
             dia = max(bb[a+3]-bb[a] for a in rad_axes)
             
             # Must be roughly coaxial and wider than the stator
-            if rad_dist < 20.0 and st_dia - 5.0 < dia < st_dia + 120.0:
+            if rad_dist < cfg["rad_dist_max"] and st_dia + cfg["dia_min_offset"] < dia < st_dia + cfg["dia_max_offset"]:
                 # Must have complex geometry (rejects simple dummy boxes and flat brackets)
-                if f.get('face_count', 0) > 150:
+                if f.get('face_count', 0) > cfg["face_count_min"]:
                     min_z, max_z = bb[motor_axis], bb[motor_axis+3]
                     z_cen = (min_z + max_z) / 2
                     s_min, s_max = st_bb[motor_axis], st_bb[motor_axis+3]

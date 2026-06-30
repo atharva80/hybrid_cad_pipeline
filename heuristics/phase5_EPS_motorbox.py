@@ -6,10 +6,13 @@ Identifies the EPS packaging blocks (motor box / master carton inserts) by lever
 extreme volumetric scaling and fill-ratio mathematics.
 """
 
+from core.config import load_heuristics_config
+
 def identify_eps(records, stator_node, motor_axis):
     """
     Identifies EPS Packaging blocks based on relative volume and bounding box fill ratio.
     """
+    cfg = load_heuristics_config()["phase5_eps"]
     if stator_node is None:
         return []
 
@@ -35,8 +38,8 @@ def identify_eps(records, stator_node, motor_axis):
         bb_vol = max(1, dim_x * dim_y * dim_z)
         fill_ratio = vol / bb_vol
         
-        # Core Heuristic: Massive relative volume, wide diameter, dense solid ratio (>25%)
-        if vol > st_vol * 1.5 and dia > st_dia * 1.5 and fill_ratio > 0.25:
+        # Core Heuristic: Massive relative volume, wide diameter, dense solid ratio
+        if vol > st_vol * cfg["vol_mult_min"] and dia > st_dia * cfg["dia_mult_min"] and fill_ratio > cfg["fill_ratio_min"]:
             eps_nodes.append(i)
             
     return eps_nodes

@@ -6,8 +6,10 @@ Identifies the PCBA plate(s) from the assembly using standard FR4 thickness heur
 """
 
 import numpy as np
+from core.config import load_heuristics_config
 
 def identify_pcb(input_path: str, phase1_results: dict):
+    cfg = load_heuristics_config()["phase4_pcb"]
     records = phase1_results['RECORDS']
     motor_axis = phase1_results['MOTOR_AXIS']
     rad_axes = [a for a in range(3) if a != motor_axis]
@@ -34,7 +36,7 @@ def identify_pcb(input_path: str, phase1_results: dict):
         
         # Valid PCB plate candidates
         # Standard FR4 thickness is 1.6mm. Bounds 1.4 to 2.0 allow CAD tolerances.
-        if 1.4 <= height <= 2.0 and dia > 40.0 and rad_dist < 10.0 and faces > 30:
+        if cfg["height_min"] <= height <= cfg["height_max"] and dia > cfg["dia_min"] and rad_dist < cfg["rad_dist_max"] and faces > cfg["faces_min"]:
             pcb_nodes.append(i)
             
     return {"PCB_PLATES": pcb_nodes}

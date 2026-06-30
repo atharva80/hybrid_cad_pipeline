@@ -30,7 +30,7 @@ class _StreamBridge(QObject):
 _PHASE_TOKENS = {
     "[Phase 1]":                 ("phase1",  1),   # (key, step_index)
     "Stage 1 ML Fallback":       ("ml1",     2),
-    "✔️":                         ("ml1",     2),
+    "":                         ("ml1",     2),
     "[Phase 5]":                 ("phase5",  3),
     "ML Resolved SHAFT":         ("ml2a",    4),
     "[Phase 2-4]":               ("phase24", 5),
@@ -38,7 +38,7 @@ _PHASE_TOKENS = {
     "ML Resolved BOTTOM_COVER":  ("ml2b",    6),
     "ML Resolved ROTOR":         ("ml2b",    6),
     "Phase 6":                   ("phase6",  7),
-    "🏆 INFERENCE RESULTS":       ("done",    8),
+    " INFERENCE RESULTS":       ("done",    8),
 }
 
 
@@ -64,15 +64,14 @@ class InferenceWorker(QThread):
     finished_all   = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, step_path: str, render_dir: str = None, export_dir: str = None,
-                 batch: bool = False, box: bool = False,
+    def __init__(self, step_paths: list, render_dir: str = None, export_dir: str = None,
+                 expected_components: list = None,
                  do_render: bool = True, do_export: bool = False):
         super().__init__()
-        self.step_path   = step_path
+        self.step_paths  = step_paths if isinstance(step_paths, list) else [step_paths]
         self.render_dir  = render_dir
         self.export_dir  = export_dir
-        self.batch       = batch
-        self.box         = box
+        self.expected_components = expected_components if expected_components is not None else []
         self.do_render   = do_render
         self.do_export   = do_export
         self._abort      = False
@@ -97,20 +96,21 @@ class InferenceWorker(QThread):
             self._render_results = render_results
         
         if self.do_export:
-            from core.step_exporter import export_named_step
+            from engine.step_exporter import export_named_step
             self._export_named_step = export_named_step
         else:
             self._export_named_step = None
 
     def _collect_steps(self):
-        if self.batch:
-            exts = ("*.step", "*.STEP", "*.stp", "*.STP")
-            files = []
-            for ext in exts:
-                files.extend(glob.glob(os.path.join(self.step_path, ext)))
-            return sorted(files)
-        else:
-            return [self.step_path]
+        files = []
+        for p in self.step_paths:
+            if os.path.isdir(p):
+                exts = ("*.step", "*.STEP", "*.stp", "*.STP")
+                for ext in exts:
+                    files.extend(glob.glob(os.path.join(p, ext)))
+            elif os.path.isfile(p):
+                files.append(p)
+        return sorted(list(set(files)))
 
     def run(self):
         # Redirect stdout so pipeline prints go to the console widget
@@ -123,11 +123,11 @@ class InferenceWorker(QThread):
             self._load_engine()
             files = self._collect_steps()
             total = len(files)
-            self.console_line.emit(f"📂  Found {total} STEP file(s)\n\n")
+            self.console_line.emit(f"  Found {total} STEP file(s)\n\n")
 
             for idx, step_file in enumerate(files):
                 if self._abort:
-                    self.console_line.emit("\n🛑  Run aborted by user.\n")
+                    self.console_line.emit("\n  Run aborted by user.\n")
                     break
 
                 self.batch_progress.emit(idx + 1, total)
@@ -137,7 +137,7 @@ class InferenceWorker(QThread):
                 model_render_out = None
 
                 try:
-                    result = self._infer_cad(step_file, expect_pcb_box=self.box)
+                    result = self._infer_cad(step_file, expected_components=self.expected_components)
                     import time; time.sleep(0.05)  # Yield GIL before heavy rendering
 
                     if self.do_render and self.render_dir:
@@ -153,7 +153,7 @@ class InferenceWorker(QThread):
                     self.file_done.emit(step_file, result, model_render_out)
 
                 except Exception as e:
-                    msg = f"❌  Error on {cad_name}:\n{traceback.format_exc()}\n"
+                    msg = f"  Error on {cad_name}:\n{traceback.format_exc()}\n"
                     self.console_line.emit(msg)
                     self.error_occurred.emit(str(e))
 

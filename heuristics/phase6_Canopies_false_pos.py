@@ -1,10 +1,12 @@
 import numpy as np
+from core.config import load_heuristics_config
 
 def identify_canopies(records, anchors, identified_nodes_set):
     """
     Phase 6: Canopy Extraction (V2 Logic - Permissive, includes false positives)
     Identifies Motor Canopies using the "Process of Elimination" trap.
     """
+    cfg = load_heuristics_config()["phase6_canopies"]
     canopy_nodes = []
     
     stator_node = anchors.get("STATOR_NODE")
@@ -41,15 +43,15 @@ def identify_canopies(records, anchors, identified_nodes_set):
         # --- V2 CANOPY TRAP (Permissive - includes false positives) ---
 
         # Filter 1: Must be hollow (removes solid brackets, rotors)
-        if fill_ratio > 0.15:
+        if fill_ratio > cfg["fill_ratio_min"]:
             continue
 
         # Filter 2: Must not be completely flat (removes washers, thin aesthetic plates)
-        if aspect_ratio_3d < 0.30:
+        if aspect_ratio_3d < cfg["aspect_ratio_max"]:
             continue
 
         # Filter 3: Basic diameter sanity check (kill tiny screws/collars)
-        if dia < 40:
+        if dia < cfg["dia_min"]:
             continue
 
         canopy_nodes.append(i)

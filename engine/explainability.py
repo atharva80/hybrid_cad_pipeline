@@ -98,4 +98,4 @@ def run_shap_explanation():
     plt.close()
     print(f"  Saved → {out_anc}")
 
-    print("\n✅ SHAP explanation complete. Plots saved to:", _PLOTS_DIR)
+    print("\n SHAP explanation complete. Plots saved to:", _PLOTS_DIR)

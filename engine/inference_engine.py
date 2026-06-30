@@ -9,6 +9,11 @@ Returns a structured dictionary of classified components and their records.
 
 import os
 import sys
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -66,7 +71,7 @@ def _solid_to_pyvista(shape):
                        np.array(faces_pv, dtype=np.int32))
 
 
-def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
+def infer_cad(step_file_path: str, expected_components: list = None) -> dict:
     """
     Run the full hybrid heuristic + ML inference pipeline on a STEP file.
 
@@ -78,7 +83,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         doc       : OpenCASCADE document (for STEP export)
     """
     print(f"\n=============================================")
-    print(f"🚀 HYBRID INFERENCING: {os.path.basename(step_file_path)}")
+    print(f" HYBRID INFERENCING: {os.path.basename(step_file_path)}")
     print(f"=============================================")
 
     # ── Phase 1: Heuristic Anchor Detection ────────────────────────────────
@@ -95,9 +100,9 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
 
     def _resolve_anchor(candidates, class_idx, name):
         if len(candidates) == 1:
-            print(f"  ✔️  {name} locked by Heuristics: Solid #{candidates[0]}")
+            print(f"    {name} locked by Heuristics: Solid #{candidates[0]}")
             return candidates[0], 1.0
-        print(f"  ⚠️  Multiple/Zero {name}s. Triggering Stage 1 ML Fallback...")
+        print(f"    Multiple/Zero {name}s. Triggering Stage 1 ML Fallback...")
         eval_nodes = candidates if candidates else list(range(len(records)))
         rows = []
         for i in eval_nodes:
@@ -119,7 +124,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         best = int(np.argmax(probs))
         node = eval_nodes[best]
         conf = float(probs[best])
-        print(f"  🤖 ML Resolved {name}: Solid #{node} (Conf: {conf*100:.1f}%)")
+        print(f"   ML Resolved {name}: Solid #{node} (Conf: {conf*100:.1f}%)")
         return node, conf
 
     stator_node, st_conf = _resolve_anchor(stator_cands, 1, "STATOR")
@@ -140,7 +145,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     # ── Phase 5: EPS Packaging Identification ──────────────────────────────
     eps_nodes = identify_eps(records, stator_node, motor_axis)
     if eps_nodes:
-        print(f"  📦 Found {len(eps_nodes)} EPS Packaging blocks. Stripping from candidate pools.")
+        print(f"   Found {len(eps_nodes)} EPS Packaging blocks. Stripping from candidate pools.")
         shaft_cands = [c for c in shaft_cands if c not in eps_nodes]
         p1["SHAFT_CANDIDATES"] = shaft_cands
         if "INSULATOR_CANDIDATES" in p1:
@@ -192,7 +197,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         best     = int(np.argmax(probs))
         node     = rows[best][0]
         conf     = float(probs[best])
-        print(f"  🤖 ML Resolved {name_str}: Solid #{node} (Conf: {conf*100:.1f}%)")
+        print(f"   ML Resolved {name_str}: Solid #{node} (Conf: {conf*100:.1f}%)")
         return node, conf
 
     # Resolve shaft first (bearings and PCB depend on it)
@@ -208,6 +213,11 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
     print(f"DEBUG: p4['PCB_PLATES'] = {p4.get('PCB_PLATES')}")
 
     pcb_nodes  = p4.get("PCB_PLATES", [])
+    
+    if expected_components is None:
+        expected_components = []
+        
+    expect_pcb_box = "PCB_BOX" in expected_components
     
     if expect_pcb_box:
         # If --box is passed, user expects multiple PCBs. Keep them all.
@@ -249,7 +259,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         if box_cands:
             pcb_box_node = max(box_cands, key=lambda n: records[n].features.get("face_count", 0))
             pb_conf = 1.0
-            print(f"  🔍 Heuristic Resolved PCB_BOX: Solid #{pcb_box_node}")
+            print(f"   Heuristic Resolved PCB_BOX: Solid #{pcb_box_node}")
 
     # Exclude 100% known heuristics from ML candidate pools
     if pcb_box_node is not None:
@@ -312,7 +322,7 @@ def infer_cad(step_file_path: str, expect_pcb_box: bool = False) -> dict:
         results.append((f"CANOPY_{i}", [c_node], 1.0))
 
     print("\n=============================================")
-    print("🏆 INFERENCE RESULTS")
+    print(" INFERENCE RESULTS")
     print("=============================================")
     for comp, nodes, conf in results:
         for node in nodes:
@@ -337,7 +347,7 @@ def render_results(inference_output: dict, out_dir: str, cad_basename: str):
     records = inference_output["records"]
     results = inference_output["results"]
 
-    print(f"\n📸 Rendering identified parts to: {out_dir}")
+    print(f"\n Rendering identified parts to: {out_dir}")
     for comp, nodes, _ in results:
         if not nodes:
             continue
@@ -360,4 +370,4 @@ def render_results(inference_output: dict, out_dir: str, cad_basename: str):
                 print(f"  Saved {comp} → {img_path}")
                 import time; time.sleep(0.05)  # Yield GIL to keep UI responsive
         except Exception as e:
-            print(f"  ❌ Failed to render {comp}: {e}")
+            print(f"   Failed to render {comp}: {e}")

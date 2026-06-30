@@ -1,6 +1,8 @@
 """
 styles.py — Premium Dark Theme for ATLAS
 """
+import os
+_GUI_DIR = os.path.dirname(os.path.abspath(__file__)).replace('\\', '/')
 
 C = {
     'bg':          '#09090B', # Zinc 950
@@ -38,8 +40,15 @@ COMPONENT_COLORS = {
     'BEARING_BOTTOM':   C['text'],
     'PCB':              C['text'],
     'PCB_BOX':          C['text'],
-    'EPS_PACKAGING':    C['text_dim'],
+    'PCB_BRACKET':      C['text'],
+    'EPS_PACKAGING':    C['text'],
     'CANOPY':           C['text'],
+    'STAYCAP':          C['text'],
+    'MASTER_BOX':       C['text'],
+    'MOTOR_BOX':        C['text'],
+    'BLADE_BOX':        C['text'],
+    'FALSE_COVER':      C['text'],
+    'SIDE_COVER':       C['text'],
 }
 
 SS = f"""
@@ -169,7 +178,7 @@ QCheckBox::indicator:hover {{ border-color: {C['text_dim']}; }}
 QCheckBox::indicator:checked {{
     background: {C['accent']};
     border: 1px solid {C['accent']};
-    image: url(gui/check.svg);
+    image: url({_GUI_DIR}/check.svg);
 }}
 
 /* Sidebar List */

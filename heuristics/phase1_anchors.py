@@ -13,21 +13,23 @@ from pathlib import Path
 # Use the local core modules (step_loader and feature_extractor)
 from core.step_loader import load_step_xcaf, extract_solids
 from core.feature_extractor import extract_all
+from core.config import load_heuristics_config
 
 def identify_anchors(input_path: str):
     doc, st = load_step_xcaf(input_path)
     records = extract_solids(st)
     extract_all(records)
+    cfg = load_heuristics_config()["phase1_anchors"]
     
     # 1. Volume filter
-    valid_nodes = [i for i, r in enumerate(records) if r.features.get('volume_mm3', 0) > 50]
+    valid_nodes = [i for i, r in enumerate(records) if r.features.get('volume_mm3', 0) > cfg["global_min_vol"]]
     
     # 2. Identify STATOR (Anchor)
     stator_candidates = []
     for i in valid_nodes:
         f = records[i].features
         vol = f.get('volume_mm3', 0)
-        if vol < 3000: continue
+        if vol < cfg["stator_min_vol"]: continue
         
         bb = f.get('_bbox', [0,0,0,0,0,0])
         dx, dy, dz = bb[3]-bb[0], bb[4]-bb[1], bb[5]-bb[2]
@@ -36,14 +38,14 @@ def identify_anchors(input_path: str):
         
         if diameter > 0:
             aspect = thickness / diameter
-            if 80 < diameter < 120 and 8 < thickness < 35 and aspect < 0.35:
+            if cfg["stator_dia_min"] < diameter < cfg["stator_dia_max"] and cfg["stator_thick_min"] < thickness < cfg["stator_thick_max"] and aspect < cfg["stator_aspect_max"]:
                 stator_candidates.append(i)
                 
     # We don't pick a hard stator node here. We return the candidates for the ML model to decide.
     # However, we must intelligently guess the temporary stator node to extract the global motor axis and bounds for the rest of the heuristics.
     temp_stator_node = None
     if stator_candidates:
-        complex_cands = [i for i in stator_candidates if records[i].features.get('face_count', 0) > 100]
+        complex_cands = [i for i in stator_candidates if records[i].features.get('face_count', 0) > cfg["stator_complex_faces"]]
         if complex_cands:
             temp_stator_node = max(complex_cands, key=lambda i: records[i].features.get('volume_mm3', 0))
         else:
@@ -74,16 +76,14 @@ def identify_anchors(input_path: str):
             min_z, max_z = bb[motor_axis], bb[motor_axis+3]
             length = bb[motor_axis+3] - bb[motor_axis]
             dia = max(bb[a+3]-bb[a] for a in rad_axes)
-            if length > 30 and dia < 60:
+            if length > cfg["rotor_inner_len_min"] and dia < cfg["rotor_inner_dia_max"]:
                 print(f"DEBUG_DUMP #{i}: length={length:.2f}, dia={dia:.2f}, rad_dist={rad_dist:.2f}")
                 
-            if rad_dist < 5.0:
+            if rad_dist < cfg["shaft_rad_dist_max"]:
                 dia = max(bb[a+3]-bb[a] for a in rad_axes)
                 min_z, max_z = bb[motor_axis], bb[motor_axis+3]
                 
-                # Must be a narrow cylinder (dia < 30), and long enough to be the motor shaft (40 < len < 180)
-                # Excludes downrod (>180) and small washers (<40)
-                if 40 < length < 180 and dia < 30:
+                if cfg["shaft_len_min"] < length < cfg["shaft_len_max"] and dia < cfg["shaft_dia_max"]:
                     # Must physically pass through stator bounds
                     if min_z <= s_max and max_z >= s_min:
                         shaft_cands.append(i)
@@ -107,11 +107,10 @@ def identify_anchors(input_path: str):
             min_z, max_z = bb[motor_axis], bb[motor_axis+3]
             
             # Must share the same diameter profile
-            if abs(dia - st_dia) < 15.0:
+            if abs(dia - st_dia) < cfg["rotor_outer_dia_tolerance"]:
                 # Must be stacked against the stator core
                 if min_z <= s_max + 10 and max_z >= s_min - 10:
-                    # Insulators are complex plastic pieces (high face count) and low volume compared to metal rings
-                    if f.get('face_count', 0) > 400 and f.get('volume_mm3', 0) < 15000:
+                    if f.get('face_count', 0) > cfg["rotor_outer_face_min"] and f.get('volume_mm3', 0) < cfg["rotor_outer_vol_max"]:
                         insulators.append((i, (min_z + max_z)/2))
                         
         up_vector = 1
@@ -143,16 +142,12 @@ def identify_anchors(input_path: str):
             min_z, max_z = bb[motor_axis], bb[motor_axis+3]
             
             # Coaxial and wraps the stator (outer diameter slightly larger)
-            if rad_dist < 5.0 and st_dia + 1.0 < dia < st_dia + 30.0:
+            if rad_dist < cfg["rotor_alt_rad_dist_max"] and st_dia + cfg["rotor_alt_dia_min_offset"] < dia < st_dia + cfg["rotor_alt_dia_max_offset"]:
                 # Z-overlap with stator
                 if min_z <= s_max and max_z >= s_min:
                     st_thick = s_max - s_min
-                    # Aspect ratio and thickness match
-                    # The Rotor Ring is a metal band whose height is roughly equal to the stator stack height
-                    if dia > 0 and (thickness / dia) < 0.6 and abs(thickness - st_thick) < 10.0:
-                        # Must be a hollow cylinder geometry to exclude magnets and brackets
-                        # or just be massive enough (exclude magnets which are tiny vol < 5000)
-                        if f.get('volume_mm3', 0) > 5000:
+                    if dia > 0 and (thickness / dia) < cfg.get("rotor_alt_aspect_max", 0.6) and abs(thickness - st_thick) < cfg["rotor_alt_thick_tolerance"]:
+                        if f.get('volume_mm3', 0) > cfg["rotor_alt_vol_min"]:
                             rotor_cands.append(i)
                             
         # We no longer pick a single Rotor Ring node here.

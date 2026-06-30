@@ -29,6 +29,11 @@ import argparse
 import glob
 import os
 import sys
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 import time
 
 
@@ -71,7 +76,7 @@ def _process_single(step_path: str, imgs_dir: str | None, out_dir: str | None, e
     t0     = time.time()
     result = infer_cad(step_path, expect_pcb_box)
     elapsed = time.time() - t0
-    print(f"\n⏱️  Inference completed in {elapsed:.2f}s")
+    print(f"\n  Inference completed in {elapsed:.2f}s")
 
     basename = os.path.splitext(os.path.basename(step_path))[0]
 
@@ -93,10 +98,10 @@ def _batch_mode(batch_dir: str, imgs_root: str | None, out_dir: str | None, expe
     """
     step_files = _find_step_files(batch_dir)
     if not step_files:
-        print(f"❌  No STEP files found under: {batch_dir}")
+        print(f"  No STEP files found under: {batch_dir}")
         sys.exit(1)
 
-    print(f"📂  Found {len(step_files)} STEP file(s) in {batch_dir}\n")
+    print(f"  Found {len(step_files)} STEP file(s) in {batch_dir}\n")
     timing = {}
 
     for idx, fpath in enumerate(step_files, 1):
@@ -112,12 +117,12 @@ def _batch_mode(batch_dir: str, imgs_root: str | None, out_dir: str | None, expe
             elapsed = _process_single(fpath, asm_imgs_dir, out_dir, expect_pcb_box)
             timing[basename] = elapsed
         except Exception as e:
-            print(f"❌  FAILED — {basename}: {e}")
+            print(f"  FAILED — {basename}: {e}")
             timing[basename] = -1
 
     # ── Timing summary ─────────────────────────────────────────────────────
     print(f"\n{'='*50}")
-    print("🕒  BATCH TIMING REPORT")
+    print("  BATCH TIMING REPORT")
     print(f"{'='*50}")
     total = 0
     for name, t in timing.items():

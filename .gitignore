@@ -33,7 +33,9 @@ venv.bak/
 # *.step
 
 # Ignore everything in CAD except test_imgs
-CAD/*
-!CAD/test_imgs/
-
+_run_history
+_cache
 test
+docs
+CAD
+export
