@@ -1,0 +1,43 @@
+{
+  "global": {
+    "mesh_type": {
+      "label": "Global Mesh Type",
+      "value": "Tet4",
+      "options": ["Tet4", "Tet10"]
+    },
+    "mesh_size": {
+      "label": "Surface Mesh Size",
+      "value": 6.0,
+      "unit": "mm"
+    },
+    "vol_mesh_size": {
+      "label": "Volume Mesh Size",
+      "value": 7.0,
+      "unit": "mm"
+    }
+  },
+  "mesh_controls": [],
+  "quality": {
+    "aspect_ratio_limit": {
+      "label": "Aspect Ratio",
+      "value": 10.0
+    },
+    "min_element_size": {
+      "label": "Min Element Size",
+      "value": 0.6,
+      "unit": "mm"
+    },
+    "max_angle_per_element": {
+      "label": "Max Angle Per Element",
+      "value": 45.0,
+      "unit": "deg"
+    }
+  },
+  "volume": {
+    "internal_grading": {
+      "label": "Internal Grading",
+      "value": 2
+    }
+  },
+  "special": {}
+}

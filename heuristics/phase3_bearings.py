@@ -76,7 +76,7 @@ def identify_bearings(input_path: str, phase1_results: dict):
         mids = [x['node'] for x in node_dims if x['node'] != outer and x['node'] != inner]
         
         return {
-            "CLUSTER_NODES": cl_nodes,
+            "CLUSTER_NODES": [outer, inner] + mids,
             "OUTER_RACE": outer,
             "INNER_RACE": inner,
             "MID_RACES": mids,

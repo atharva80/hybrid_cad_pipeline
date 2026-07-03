@@ -1,0 +1,20 @@
+{
+  "component": "ROTOR_RING",
+  "script": "mesh_rotor_ring",
+  "description": "Direct mesh workflow for ROTOR_RING — no IsoLine mesh controls",
+  "global": {
+    "surf_mesh_size": { "value": 4.5,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Surface Mesh Size" },
+    "vol_mesh_size":  { "value": 5.0,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Volume Mesh Size" },
+    "mesh_type":      { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

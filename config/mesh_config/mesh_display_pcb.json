@@ -1,0 +1,41 @@
+{
+  "component": "DISPLAY_PCB",
+  "script": "mesh_display_pcb",
+  "description": "Mesh workflow for DISPLAY_PCB with hole removal and cylinder IsoLine control",
+  "global": {
+    "surf_mesh_size": { "value": 3.5,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Surface Mesh Size" },
+    "vol_mesh_size":  { "value": 3.5,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Volume Mesh Size" },
+    "mesh_type":      { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "DISPLAY_PCB_HoleRemoval",
+      "type": "Hole_Removal",
+      "label": "Remove Small Holes",
+      "params": {
+        "r_min": { "value": 0.0, "unit": "mm", "label": "Min Hole Radius" },
+        "r_max": { "value": 2.0, "unit": "mm", "label": "Max Hole Radius" }
+      }
+    },
+    {
+      "name": "DISPLAY_PCB_IsoLine_Cyl",
+      "type": "IsoLine_Cylinder",
+      "label": "Mounting Cylinder Faces",
+      "params": {
+        "r_min":      { "value": 2.05, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 2.15, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 8,    "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

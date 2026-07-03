@@ -1,0 +1,29 @@
+{
+  "component": "BOTTOM_COVER",
+  "script": "mesh_bottom_cover",
+  "description": "Mesh workflow for BOTTOM_COVER with Logo Removal mesh control",
+  "global": {
+    "surf_mesh_size": { "value": 3.5,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Surface Mesh Size" },
+    "vol_mesh_size":  { "value": 4.0,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Volume Mesh Size" },
+    "mesh_type":      { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "BOTTOM_COVER_LogoRemoval",
+      "type": "Logo_Removal",
+      "label": "Logo Removal",
+      "params": {
+        "logo_thickness": { "value": 2.0, "unit": "mm", "label": "Logo Detection Thickness" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

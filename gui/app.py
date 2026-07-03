@@ -12,6 +12,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from gui.styles import C, SS, COMPONENT_COLORS, ML_COMPONENTS
 from gui.worker import InferenceWorker
+from gui.meshing_page import MeshingPage
 
 # ── Segmented nav button ───────────────────────────────────────────────────
 class NavBtn(QPushButton):
@@ -617,6 +618,9 @@ class ResultsPage(QWidget):
         self.export_btn = QPushButton("Export CADs")
         self.export_btn.setObjectName("primary_btn")
         
+        self.simlab_btn = QPushButton("Open in SimLab")
+        self.simlab_btn.setStyleSheet("background: #2E7D52; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; font-size: 12px;")
+        
         self.remove_btn = QPushButton("Remove Selected")
         self.remove_btn.setObjectName("danger_btn")
         self.remove_btn.hide()
@@ -624,6 +628,8 @@ class ResultsPage(QWidget):
         header.addWidget(self.save_btn)
         header.addSpacing(8)
         header.addWidget(self.export_btn)
+        header.addSpacing(8)
+        header.addWidget(self.simlab_btn)
         header.addSpacing(8)
         header.addWidget(self.remove_btn)
 
@@ -946,9 +952,10 @@ class App(QMainWindow):
 
         self.import_page  = ImportPage()
         self.results_page = ResultsPage()
-        for p in [self.import_page, self.results_page]: self._pages_w.addWidget(p)
+        self.meshing_page = MeshingPage()
+        for p in [self.import_page, self.results_page, self.meshing_page]: self._pages_w.addWidget(p)
 
-        for i, label in enumerate(["Import", "Results"]):
+        for i, label in enumerate(["Import", "Results", "Meshing"]):
             btn = NavBtn(label)
             btn.clicked.connect(lambda _, idx=i: self._switch_page(idx))
             nav_layout.addWidget(btn)
@@ -987,13 +994,18 @@ class App(QMainWindow):
         self.load_btn.clicked.connect(self._load_run)
         self.results_page.save_btn.clicked.connect(self._save_run)
         self.results_page.export_btn.clicked.connect(self._export_cads)
+        self.results_page.simlab_btn.clicked.connect(self._open_in_simlab)
         self.debug_toggle.toggled.connect(self.debug_console.setVisible)
         
         self.results_page.correctionRequested.connect(self._handle_correction)
         self.results_page.massRemoveRequested.connect(self._handle_mass_remove)
+        
+        self.meshing_page.meshRequested.connect(self._handle_mesh)
+        self.meshing_page.meshAllRequested.connect(self._handle_mesh_all)
 
-        # Hide Results tab initially
+        # Hide Results and Meshing tabs initially
         self._nav_btns[1].hide()
+        self._nav_btns[2].hide()
 
         self._switch_page(0)
 
@@ -1250,10 +1262,11 @@ class App(QMainWindow):
         
         try:
             report = {
-                "version": "1.0",
+                "version": "1.2",
                 "results": self.results_page._data_map,
                 "renders": self.results_page._renders_map,
-                "render_path": self.opt_render.path
+                "render_path": self.opt_render.path,
+                "paths": getattr(self.results_page, '_paths_map', {})
             }
             report_path = os.path.join(history_dir, f"{name.strip()}.json")
             with open(report_path, "w") as f:
@@ -1281,22 +1294,171 @@ class App(QMainWindow):
             
             records = getattr(self.results_page, '_records_map', {}).get(filename, [])
             original_path = getattr(self.results_page, '_paths_map', {}).get(filename, "")
-            
-            if not records or not original_path:
-                QMessageBox.warning(self, "Export Failed", "Cannot export CADs from a loaded run. The JSON history does not save the original 3D geometries. Please parse a fresh STEP file to export.")
+            if not original_path or not os.path.exists(original_path):
+                QMessageBox.warning(self, "Export Failed", "Cannot export CAD from history because the original STEP file was not found on disk.")
                 self.progress.setValue(100)
                 self.progress_lbl.setText("Export aborted")
                 return
+                
+            if not records:
+                self.progress_lbl.setText(f"Re-parsing {filename} geometry...")
+                QApplication.processEvents()
+                try:
+                    from core.step_loader import load_step_xcaf, extract_solids
+                    doc, shape_tool = load_step_xcaf(original_path)
+                    records = extract_solids(shape_tool)
+                except Exception as e:
+                    QMessageBox.warning(self, "Parse Failed", f"Failed to parse CAD: {e}")
+                    return
             
             res_dict = {"results": results_list, "records": records}
             try:
                 export_named_step(res_dict, d, original_path)
+                
+                if not hasattr(self, 'last_export_path'): self.last_export_path = {}
+                basename = os.path.splitext(os.path.basename(original_path))[0]
+                self.last_export_path[filename] = os.path.join(d, f"{basename}_NAMED.step")
+                
                 exported_count += 1
             except Exception as e:
                 print(f"Error exporting {filename}: {e}")
                 
         self.progress.setValue(100)
         self.progress_lbl.setText(f"Exported {exported_count} CADs")
+
+    def _open_in_simlab(self):
+        idx = self.results_page.sidebar.currentRow()
+        if idx < 0 or idx >= len(self.results_page._filenames): return
+        filename = self.results_page._filenames[idx]
+        
+        if not hasattr(self, 'last_export_path'): self.last_export_path = {}
+        export_path = self.last_export_path.get(filename)
+        
+        if not export_path or not os.path.exists(export_path):
+            export_dir = os.path.join(_ROOT, "exports")
+            os.makedirs(export_dir, exist_ok=True)
+            
+            results_list = self.results_page._data_map.get(filename)
+            records = getattr(self.results_page, '_records_map', {}).get(filename, [])
+            original_path = getattr(self.results_page, '_paths_map', {}).get(filename, "")
+            
+            if not original_path or not os.path.exists(original_path):
+                QMessageBox.warning(self, "SimLab Failed", "Cannot auto-export CAD from history because the original STEP file was not found on disk.")
+                return
+                
+            if not records:
+                self.progress_lbl.setText(f"Re-parsing {filename} geometry...")
+                QApplication.processEvents()
+                try:
+                    from core.step_loader import load_step_xcaf, extract_solids
+                    doc, shape_tool = load_step_xcaf(original_path)
+                    records = extract_solids(shape_tool)
+                except Exception as e:
+                    QMessageBox.warning(self, "Parse Failed", f"Failed to parse CAD: {e}")
+                    return
+                
+            from engine.step_exporter import export_named_step
+            res_dict = {"results": results_list, "records": records}
+            
+            self.progress_lbl.setText(f"Auto-exporting {filename} for SimLab...")
+            QApplication.processEvents()
+            try:
+                export_named_step(res_dict, export_dir, original_path)
+                basename = os.path.splitext(os.path.basename(original_path))[0]
+                expected_path = os.path.join(export_dir, f"{basename}_NAMED.step")
+                
+                if os.path.exists(expected_path):
+                    export_path = expected_path
+                    self.last_export_path[filename] = export_path
+                else:
+                    QMessageBox.warning(self, "SimLab Failed", f"Expected export file not found: {expected_path}")
+                    return
+            except Exception as e:
+                QMessageBox.warning(self, "SimLab Failed", f"Export failed: {e}")
+                return
+                
+        self.progress_lbl.setText("Launching SimLab...")
+        QApplication.processEvents()
+        
+        import subprocess
+        simlab_exe = r"E:\Program Files\Altair\SimLab\bin\win64\SimLab.bat"
+        if not os.path.exists(simlab_exe):
+            QMessageBox.warning(self, "SimLab Not Found", f"Could not find SimLab at:\n{simlab_exe}")
+            return
+            
+        # Write the import macro
+        macro_path = os.path.join(_ROOT, "_cache", "simlab_import_macro.py")
+        os.makedirs(os.path.dirname(macro_path), exist_ok=True)
+        
+        macro_code = f'''import simlab
+
+UnitSystem = """ <UnitSystem UUID="3aca8564-4d38-4b0b-887c-6a542d4001c6">
+  <SetCurrentDisplaySystem Name="MMKS (mm kg N C s)"/>
+</UnitSystem>"""
+simlab.execute(UnitSystem)
+
+STEP_Import = """ <STEP_Import CheckBox="ON" Type="STEP" UUID="e88f2fcc-2430-4e47-9455-78b4dea9b064" gda="">
+  <FileName HelpStr="File name to be imported." Value="{export_path.replace(chr(92), '/')}" widget="LineEdit"/>
+  <Method Value="Convert to Parasolid"/>
+  <BodyName Value="1"/>
+  <ReadPartName Value="0"/>
+  <SketchWireframe Value="0"/>
+  <Groups Value="0"/>
+  <Imprint Value="0"/>
+  <Facets Value="0"/>
+  <AssemblyStructure Value="1"/>
+  <SaveGeometryInDatabase Value="1"/>
+</STEP_Import>"""
+simlab.execute(STEP_Import)
+'''
+        with open(macro_path, "w") as f:
+            f.write(macro_code)
+
+        # The API listener is now a permanent standalone script (simlab_api_server.py)
+        # which the user will trigger via a custom SimLab dialog/ribbon button.
+
+        try:
+            # Launch SimLab passing the macro to execute automatically, fully detaching it 
+            # and muting stdout/stderr to prevent Windows pipe buffer deadlocks on large CADs.
+            import subprocess
+            import copy
+            
+            clean_env = os.environ.copy()
+            for k in list(clean_env.keys()):
+                if k.upper() in ["PYTHONHOME", "PYTHONPATH"]:
+                    del clean_env[k]
+                    
+            DETACHED_PROCESS = 0x00000008
+            subprocess.Popen(
+                [simlab_exe, "-auto", macro_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=DETACHED_PROCESS,
+                cwd=os.path.dirname(simlab_exe),
+                env=clean_env
+            )
+            self.progress_lbl.setText(f"Opened {os.path.basename(export_path)} in SimLab")
+            
+            # Populate and unlock Meshing Tab immediately
+            comps = []
+            if filename in self.results_page._data_map:
+                # Only include components that actually have assigned solids (len(res[1]) > 0)
+                comps = [res[0] for res in self.results_page._data_map[filename] if res[1]]
+            session_dir = os.path.dirname(self.current_report_path) if self.current_report_path else None
+            renders = self.results_page._renders_map.get(filename, {})
+            self.meshing_page.populate(comps, session_dir, renders)
+            self._nav_btns[2].show()
+            self._switch_page(2)
+
+            # Show instruction message box (non-blocking if we prefer, but for now just show it after tab switch)
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowTitle("Connect Live Meshing")
+            msg.setText("SimLab is launching! Once it is fully open and the CAD is loaded, click your custom 'Start ATLAS API' button in the SimLab Ribbon to activate Live Meshing!")
+            msg.exec()
+            
+        except Exception as e:
+            QMessageBox.warning(self, "SimLab Failed", f"Failed to launch SimLab: {e}")
 
     def _load_run(self):
         history_dir = os.path.join(_ROOT, "_run_history")
@@ -1318,7 +1480,9 @@ class App(QMainWindow):
                 self.opt_render.btn.setStyleSheet(f"color: {C['accent']}; font-weight: bold; text-align: left; background: transparent; border: none; text-decoration: underline;")
                 
             for filename, results in report.get("results", {}).items():
-                self.results_page.populate(filename, results, [])
+                # Populate expects: populate(self, step_path, results, records)
+                original_path = report.get("paths", {}).get(filename, filename)
+                self.results_page.populate(original_path, results, [])
                 
             for filename, renders in report.get("renders", {}).items():
                 valid_renders = {k: v for k, v in renders.items() if isinstance(v, str) and os.path.exists(v)}
@@ -1330,6 +1494,81 @@ class App(QMainWindow):
             self._switch_page(target_page)
         except Exception as e:
             print(f"Error loading report: {e}")
+
+    def _handle_mesh(self, comp_name: str, config: dict):
+        """
+        Dispatch a mesh job via TCP to the SimLab API server.
+        config is a flat dict of param keys -> values from MeshConfigPanel.
+        If config is empty (Mesh All), JSON defaults are used.
+        """
+        script_map = {
+            "TOP_COVER":    "mesh_top_cover_complete.py",
+            "OUTER_RACE":   "mesh_races.py",
+            "MID_RACE":     "mesh_races.py",
+            "INNER_RACE":   "mesh_races.py",
+            "BEARING_TOP":  "mesh_races.py",
+            "BEARING_BOTTOM":"mesh_races.py",
+            "SHAFT":        "mesh_shaft.py",
+            "STATOR":       "mesh_stator.py",
+            "ROTOR_RING":   "mesh_rotor_ring.py",
+            "PCB_BRACKET":  "mesh_pcb_bracket.py",
+            "DISPLAY_PCB":  "mesh_display_pcb.py",
+            "BOTTOM_COVER": "mesh_bottom_cover.py",
+            "EPS_PACKAGING":"mesh_EPS.py",
+            "BODY":         "mesh_body.py",
+        }
+
+        # Resolve base name (strip numeric suffix e.g. OUTER_RACE_1 -> OUTER_RACE)
+        base_name = comp_name
+        for standard in script_map:
+            if comp_name == standard or comp_name.startswith(standard + "_"):
+                base_name = standard
+                break
+
+        script_file = script_map.get(base_name, "mesh_body.py")
+        script_path = os.path.join(_ROOT, "mesh_templates", script_file)
+        if not os.path.exists(script_path):
+            QMessageBox.warning(self, "Mesh Error", f"Mesh script not found: {script_file}")
+            return
+
+        try:
+            import socket, json
+            
+            # The SimLab script needs to know the correct path to the temp directory
+            temp_dir = os.path.join(_ROOT, "EXISTING_SCRIPTS", "TEMP").replace(chr(92), '/')
+            os.makedirs(temp_dir, exist_ok=True)
+            config["__temp_dir__"] = temp_dir
+            
+            payload = json.dumps({
+                "script_name": script_file,
+                "body_name": comp_name,
+                "config": config,
+                "scripts_dir": os.path.join(_ROOT, "mesh_templates").replace('\\', '/')
+            })
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(5.0)  # Increased from 2.0s
+                s.connect(('127.0.0.1', 5050))
+                s.sendall(payload.encode('utf-8'))
+                s.close()
+                self.progress_lbl.setText(f"API: Dispatched mesh job for {comp_name}")
+            except ConnectionRefusedError:
+                QMessageBox.warning(self, "API Error",
+                    "SimLab API listener is not running!\n"
+                    "Click the 'ATLAS API' button in SimLab first.")
+            except socket.timeout:
+                QMessageBox.warning(self, "API Error",
+                    "Connection to SimLab API timed out!\n"
+                    "Please close SimLab, restart it, and click 'ATLAS API' again.")
+        except Exception as e:
+            QMessageBox.critical(self, "Mesh Error", f"Failed to dispatch mesh script: {e}")
+
+    def _handle_mesh_all(self, jobs):
+        """Dispatch all components using their saved JSON default configs."""
+        for comp_name, config in jobs:
+            self._handle_mesh(comp_name, config)
+            time.sleep(0.1)
+        self.progress_lbl.setText("Dispatched all mesh jobs")
 
 def main():
     app = QApplication(sys.argv)

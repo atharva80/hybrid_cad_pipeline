@@ -1,0 +1,50 @@
+{
+  "component": "TOP_COVER",
+  "script": "mesh_top_cover_complete",
+  "description": "Mesh workflow for TOP_COVER with Logo Removal, OR seating, and bolt-hole IsoLine controls",
+  "global": {
+    "mesh_size":  { "value": 4.0,   "unit": "mm", "min": 1.0, "max": 10.0, "label": "Surface / Volume Mesh Size" },
+    "mesh_type":  { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "TOP_COVER_LogoRemoval",
+      "type": "Logo_Removal",
+      "label": "Logo Removal",
+      "params": {
+        "logo_thickness": { "value": 1.0, "unit": "mm", "label": "Logo Detection Thickness" }
+      }
+    },
+    {
+      "name": "TOP_COVER_IsoLine_OR",
+      "type": "IsoLine_Cylinder",
+      "label": "Outer Race Seating",
+      "params": {
+        "r_min":      { "value": 17.4, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 17.6, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 28,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "TOP_COVER_IsoLine_Bolt",
+      "type": "IsoLine_Cylinder",
+      "label": "Bolt Hole Faces",
+      "params": {
+        "r_min":      { "value": 2.4,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 2.6,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 12,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

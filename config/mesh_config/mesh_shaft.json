@@ -1,0 +1,48 @@
+{
+  "component": "SHAFT",
+  "script": "mesh_shaft",
+  "description": "Complete mesh workflow for SHAFT with stator & inner-race seating IsoLine controls",
+  "global": {
+    "mesh_size":  { "value": 4.0,   "unit": "mm",  "min": 1.0, "max": 10.0, "label": "Surface / Volume Mesh Size" },
+    "mesh_type":  { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "SHAFT_IsoLine_InnerRace",
+      "type": "IsoLine_Cylinder",
+      "label": "Inner Race Seating",
+      "params": {
+        "r_min":      { "value": 7.4,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 7.6,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 16,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "SHAFT_IsoLine_Stator",
+      "type": "IsoLine_Cylinder",
+      "label": "Stator Seating",
+      "params": {
+        "r_min":      { "value": 7.7,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 7.75, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 6,    "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0,  "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25,  "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,   "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  },
+  "special": {
+    "target_area":  { "value": 527.9, "unit": "mm2", "label": "Stator Seating Target Area" },
+    "area_tolerance": { "value": 10.0, "unit": "mm2", "label": "Area Match Tolerance" },
+    "changelayers_axial_elems": { "value": 5,  "label": "ChangeLayers Axial Elements" },
+    "changelayers_circ_elems":  { "value": 24, "label": "ChangeLayers Circumferential Elements" }
+  }
+}

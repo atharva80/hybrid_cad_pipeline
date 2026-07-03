@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Parameters>
+<Description>
+		<SimLab>2025.1</SimLab>
+		<Date>2026-7-2</Date>
+		<Time>16:7:51</Time>
+</Description>
+	<Parameter>
+		<Name>Geometry</Name>
+		<Type>String</Type>
+		<Value>prime_named_paratr.x_t</Value>
+	</Parameter>
+	<Parameter>
+		<Name>CalculateAreaPath</Name>
+		<Type>String</Type>
+		<Value>F:/02.CAE/ATHARVA/hybrid_cad_pipeline/EXISTING_SCRIPTS/TEMP/shaft_area.csv</Value>
+	</Parameter>
+	<Parameter>
+		<Name>STEP_ImportPath</Name>
+		<Type>String</Type>
+		<Value>F:/02.CAE/ATHARVA/hybrid_cad_pipeline/exports/prime_NAMED.step</Value>
+	</Parameter>
+</Parameters>

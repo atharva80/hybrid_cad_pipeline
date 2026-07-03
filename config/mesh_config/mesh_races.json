@@ -1,0 +1,86 @@
+{
+  "component": "RACES",
+  "script": "mesh_races",
+  "description": "Mesh workflow for OUTER_RACE, MID_RACE, and INNER_RACE with merge logic",
+  "global": {
+    "mesh_size":  { "value": 4.0,   "unit": "mm",  "min": 1.0, "max": 10.0, "label": "Surface / Volume Mesh Size" },
+    "mesh_type":  { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "OUTER_RACE_IsoLine_Inner",
+      "type": "IsoLine_Cylinder",
+      "label": "Outer Race — Inner Bore",
+      "params": {
+        "r_min":      { "value": 13.5, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 13.6, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 24,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "OUTER_RACE_IsoLine_Outer",
+      "type": "IsoLine_Cylinder",
+      "label": "Outer Race — Outer Ring",
+      "params": {
+        "r_min":      { "value": 17.4, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 17.6, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 28,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "MID_RACE_IsoLine_Inner",
+      "type": "IsoLine_Cylinder",
+      "label": "Mid Race — Inner Surface",
+      "params": {
+        "r_min":      { "value": 11.4, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 11.5, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 20,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "MID_RACE_IsoLine_Outer",
+      "type": "IsoLine_Cylinder",
+      "label": "Mid Race — Outer Surface",
+      "params": {
+        "r_min":      { "value": 13.5, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 13.6, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 20,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "INNER_RACE_IsoLine_Inner",
+      "type": "IsoLine_Cylinder",
+      "label": "Inner Race — Shaft Bore",
+      "params": {
+        "r_min":      { "value": 7.4,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 7.6,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 16,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "INNER_RACE_IsoLine_Outer",
+      "type": "IsoLine_Cylinder",
+      "label": "Inner Race — Outer Ring",
+      "params": {
+        "r_min":      { "value": 11.4, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 11.5, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 20,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

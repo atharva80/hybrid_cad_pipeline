@@ -1,0 +1,42 @@
+{
+  "component": "STATOR",
+  "script": "mesh_stator",
+  "description": "Complete mesh workflow for STATOR with shaft-seating and small-cylinder IsoLine controls",
+  "global": {
+    "mesh_size":  { "value": 5.0,   "unit": "mm",  "min": 1.0, "max": 10.0, "label": "Surface / Volume Mesh Size" },
+    "mesh_type":  { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "STATOR_IsoLine_Shaft",
+      "type": "IsoLine_Cylinder",
+      "label": "Shaft Seating Faces",
+      "params": {
+        "r_min":      { "value": 7.65, "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 7.75, "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 20,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "STATOR_IsoLine_SmallCyl",
+      "type": "IsoLine_Cylinder",
+      "label": "Small Cylinder Faces",
+      "params": {
+        "r_min":      { "value": 2.9,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 3.1,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 2.5,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 12,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}
