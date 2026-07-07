@@ -1,0 +1,35 @@
+# Goal: Fix Windows Compatibility and GUI Feedback for the CAD Pipeline
+
+The CAD pipeline environment is correctly configured with `ocp`, but several bugs give the impression that the application is broken. This plan addresses the lack of UI feedback during heavy processing, fixes Windows terminal emoji crashes, and corrects an internal import error.
+
+## User Review Required
+No breaking changes. This will purely improve the UI experience and fix hidden bugs.
+
+## Proposed Changes
+
+### GUI and Worker Fixes
+These changes ensure the user is actually aware that processing is happening.
+
+#### [MODIFY] gui/app.py
+- Update `_run()` to automatically show the debug console when "Process" is clicked.
+- Change the progress bar behavior to be indeterminate (a scrolling animation) while a single file is processing, so the user knows it hasn't frozen.
+
+#### [MODIFY] gui/worker.py
+- Fix line 99: Change `from core.step_exporter` to `from engine.step_exporter`.
+
+---
+
+### Windows Terminal Compatibility
+These changes prevent `main.py` from instantly crashing when executed from standard `cmd.exe` or PowerShell without a UTF-8 environment variable.
+
+#### [MODIFY] main.py
+- Add `sys.stdout.reconfigure(encoding='utf-8')` at the top of the file to force UTF-8 output and safely print the terminal emojis (🚀, 🏆).
+
+#### [MODIFY] engine/inference_engine.py
+- Ensure any standalone executions of `inference_engine.py` also force UTF-8 encoding.
+
+## Verification Plan
+### Manual Verification
+1. I will run `python gui/app.py` (via a background test) to ensure it starts without syntax errors.
+2. The user will be asked to run the GUI, load a CAD file, and hit "Process" to verify that the console automatically opens and progress is visually indicated.
+3. The user will be asked to run `python main.py --in CAD\Normal\prime.STEP --imgs test_renders` to ensure it doesn't immediately crash due to encoding errors.

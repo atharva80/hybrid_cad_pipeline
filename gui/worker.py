@@ -137,7 +137,23 @@ class InferenceWorker(QThread):
                 model_render_out = None
 
                 try:
-                    result = self._infer_cad(step_file, expected_components=self.expected_components)
+                    raw_result = self._infer_cad(step_file, expected_components=self.expected_components)
+                    
+                    # Flatten results so that each solid is its own distinct item (e.g. PCB_1, PCB_2)
+                    flat_result = []
+                    for res in raw_result:
+                        comp = res[0]
+                        nodes = res[1]
+                        if len([n for n in nodes if n is not None]) > 1:
+                            valid_idx = 1
+                            for n in nodes:
+                                if n is not None:
+                                    flat_result.append((f"{comp}_{valid_idx}", [n], res[2], res[3] if len(res)>3 else False))
+                                    valid_idx += 1
+                        else:
+                            flat_result.append(res)
+                    result = flat_result
+
                     import time; time.sleep(0.05)  # Yield GIL before heavy rendering
 
                     if self.do_render and self.render_dir:

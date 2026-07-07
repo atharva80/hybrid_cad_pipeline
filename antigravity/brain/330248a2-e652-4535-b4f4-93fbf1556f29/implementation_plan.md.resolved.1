@@ -1,0 +1,30 @@
+# Goal: SimLab Integration Phase 1 - "Open in SimLab"
+
+We will add a new action button to the Results table that seamlessly bridges the PySide6 app with Altair SimLab. It will handle auto-exporting the identified components to an `exports/` folder (if they haven't been exported yet) and launch SimLab with the named STEP file.
+
+## User Review Required
+Please confirm the behavior of the auto-export and the SimLab startup process.
+
+## Open Questions
+> [!IMPORTANT]
+> 1. Does `SimLab.bat` support directly opening a CAD file by passing the file path as an argument (e.g., `SimLab.bat "C:\path\to\model.step"`)? Or must we pass a Python macro file to it (e.g. `SimLab.bat -play import_macro.py`)? I will assume we can just pass the filepath directly or generate a basic Python macro. If you have the exact macro code SimLab generates when you manually go to `File -> Import -> STEP`, please share it!
+
+## Proposed Changes
+
+### [MODIFY] gui/app.py
+1. **Add Button**: Add an `Open in SimLab` button to the `ResultsPage` header, colored differently (maybe accent color `#4A9EFF` or `#2ECC71`).
+2. **Export State Tracking**: 
+   - Add a `self.last_export_path` dict to track where each file was exported.
+3. **SimLab Action Logic**:
+   - Create a method `_open_in_simlab()`.
+   - When clicked, check if `self.last_export_path` has the path for the current `_current_file`.
+   - If not, forcefully run a background export of the current file into `e:\Atomberg\hybrid_cad_pipeline\exports\`.
+   - Once exported, use Python's `subprocess.Popen` to launch:
+     `"C:\Program Files\Altair\2025.1\SimLab\bin\win64\SimLab.bat"` passing the path of the exported STEP file so it automatically loads.
+
+## Verification Plan
+1. Launch PySide6 GUI.
+2. Load a CAD, hit "Process".
+3. Click "Open in SimLab".
+4. Ensure the `exports/` folder is created and populated with the named STEP file.
+5. Verify that SimLab opens successfully with the model loaded.

@@ -119,9 +119,29 @@ class LiveMeshBadge(tk.Tk):
         try:
             job = job_queue.get_nowait()
             if job:
-                self.log(f"Received job: {job.get('script_name', 'Unknown')}")
+                task_type = job.get("task_type", "mesh")
+                self.log(f"Received job type: {task_type}")
                 if "code" in job:
                     code = job["code"]
+                elif task_type == "create_contact":
+                    contact_name = job.get("contact_name")
+                    config = job.get("config", {})
+                    scripts_dir = job.get("scripts_dir", os.path.join(_ROOT, "contact_templates").replace('\\', '/'))
+                    module_name = "create_contact"
+                    self.log(f"Processing contact: {contact_name}")
+                    
+                    code = f"""import sys, os
+scripts_dir = r"{scripts_dir}"
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
+
+import {module_name}
+import importlib
+importlib.reload({module_name})
+
+CONFIG = {repr(config)}
+{module_name}.run("{contact_name}", CONFIG)
+"""
                 else:
                     script_name = job.get("script_name")
                     body_name = job.get("body_name")
@@ -129,8 +149,10 @@ class LiveMeshBadge(tk.Tk):
                     scripts_dir = job.get("scripts_dir", os.path.join(_ROOT, "mesh_templates").replace('\\', '/'))
                     
                     module_name = script_name.replace(".py", "")
+                    self.log(f"Processing mesh: {body_name} with {script_name}")
                     
                     code = f"""import sys, os
+sys.dont_write_bytecode = True
 scripts_dir = r"{scripts_dir}"
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
@@ -148,7 +170,7 @@ CONFIG = {repr(config)}
                 with open(tmp_job, "w", encoding="utf-8") as f:
                     f.write(code)
                 try: 
-                    self.log(f"-> EXECUTING MACRO IN SIMLAB KERNEL: {module_name}.run('{body_name}')")
+                    self.log(f"-> EXECUTING MACRO IN SIMLAB KERNEL: {module_name}")
                     simlab.executeFile(tmp_job)
                     self.log("<- EXECUTION COMPLETED SUCCESSFULLY")
                 except Exception as e: 

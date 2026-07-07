@@ -9,87 +9,47 @@ def run(BODY_NAME, config):
     print(f"  {BODY_NAME} — Complete Mesh Workflow")
     print("=" * 60)
 
-    models = simlab.getAllModels()
-    MODEL = models[0] if models else "$Geometry"
-
-    mesh_size = _v('global.mesh_size', 6.0)
-    vol_mesh_size = _v('global.vol_mesh_size', 7.0)
-    mesh_type = _v('global.mesh_type', 'Tet4')
-    
-    aspect_ratio_limit = _v('quality.aspect_ratio_limit', 10.0)
-    min_element_size = _v('quality.min_element_size', 0.6)
-    max_angle_per_element = _v('quality.max_angle_per_element', 45.0)
-    internal_grading = _v('volume.internal_grading', 2)
-
     UnitSystem=''' <UnitSystem UUID="3aca8564-4d38-4b0b-887c-6a542d4001c6">
   <SetCurrentDisplaySystem Name="MMKS (mm kg N C s)"/>
  </UnitSystem>'''
     simlab.execute(UnitSystem)
-
-    SurfaceMesh=f''' <SurfaceMesh UUID="08df0ff6-f369-4003-956c-82781326c876">
-  <tag Value="-1"/>
-  <SurfaceMeshType Value="Tri"/>
-  <SupportEntities>
-   <Entities>
-    <Model>{MODEL}</Model>
-    <Body>"{BODY_NAME}",</Body>
-   </Entities>
-  </SupportEntities>
-  <Tri>
-   <ElementType Value="Tri3"/>
-   <AverageElementSize Checked="1" Value="{mesh_size} mm"/>
-   <MaximumElementSize Checked="0" Value="8.484 mm"/>
-   <MinimumElementSize Value="{min_element_size} mm"/>
-   <GradeFactor Value="1.5"/>
-   <MaximumAnglePerElement Value="{max_angle_per_element} deg"/>
-   <CurvatureMinimumElementSize Value="3 mm"/>
-   <AspectRatio Value="{aspect_ratio_limit}"/>
-   <IdentifyFeaturesAndMesh Checked="1"/>
-   <MergeTinyFillets Checked="1"/>
-   <CreateMatchingMesh Checked="0"/>
-   <AdvancedOptions>
-    <ImprintMeshing Checked="0"/>
-    <Jacobian Checked="0" Value="0.5"/>
-    <RemoveFloatingVertices Checked="0" Value="135.0"/>
-    <BetterGeometryApproximation Checked="0"/>
-    <CoarseMesh Checked="0"/>
-    <CoarseMesh_UseExistingNodes Checked="0"/>
-    <CreateNewMeshModel Checked="0"/>
-    <UserDefinedModelName Value=""/>
-    <Tri6WithStraightEdges Checked="0"/>
-    <SkipIntersectionCleanup Checked="0"/>
-    <ImproveSkewAngle Value="0"/>
-    <MappedMesh Value="0"/>
-    <MeshPattern Value="0"/>
-   </AdvancedOptions>
-  </Tri>
- </SurfaceMesh>'''
-    simlab.execute(SurfaceMesh)
 
     TetMesh=f''' <TetMesher UUID="83822e68-12bb-43b9-b2ac-77e0b9ea5149">
   <tag Value="-1"/>
   <Name Value="TetMesher1"/>
   <SupportEntities>
    <Entities>
-    <Model>{MODEL}</Model>
+    <Model>$Geometry</Model>
     <Body>"{BODY_NAME}",</Body>
    </Entities>
   </SupportEntities>
-  <MeshType Value="{mesh_type}"/>
-  <AverageElemSize Value="{vol_mesh_size} mm"/>
+  <MeshType Value="Tet4"/>
+  <AverageElemSize Value="4 mm"/>
   <MaxElemSize Checked="0" Value="0"/>
-  <InternalGrading Value="{internal_grading}"/>
+  <InternalGrading Value="2"/>
   <MinQuality Value="0.12"/>
   <LinearQuality Value="2"/>
   <MaxQuality Value="1"/>
   <QuadMinQuality Value="0.001"/>
   <QuadQuality Value="0"/>
   <QuadMaxQuality Value="1"/>
-  <CadBody Value="0"/>
+  <CadBody Value="1"/>
   <IdentifyFeaturesAndMesh Checked="0"/>
   <MergeTinyFillets Checked="0"/>
   <CreateMatchingMesh Checked="0"/>
   <TransferMeshcontrolFromCAD Checked="0"/>
+  <SurfaceMeshParametersForCADInput>
+   <AverageElementSize Checked="1" Value="4 mm"/>
+   <MaximumElementSize Checked="0" Value="5.656 mm"/>
+   <MinimumElementSize Value="0.4 mm"/>
+   <GradeFactor Value="1.5"/>
+   <MaximumAnglePerElement Value="45 deg"/>
+   <CurvatureMinimumElementSize Value="2 mm"/>
+   <AspectRatio Value="10"/>
+   <ImproveSkewAngle Value="None"/>
+   <MappedMesh Value="Auto"/>
+   <MeshPattern Value="Iso mesh"/>
+  </SurfaceMeshParametersForCADInput>
   <AdvancedOptions>
    <MeshDensity Value="0"/>
    <CreateNewMeshModel Checked="0"/>
@@ -106,4 +66,22 @@ def run(BODY_NAME, config):
   </AdvancedOptions>
  </TetMesher>'''
     simlab.execute(TetMesh)
+    print(f"  OK Tet4 direct CAD volume mesh done")
 
+    # ===============================================================
+    # Move to root so it merges cleanly
+    # ===============================================================
+    all_models = simlab.getAllRootModelNames("all")
+    mesh_model = next((m for m in all_models if "_SM" in m or m.endswith(".gda")), None)
+    
+    if mesh_model:
+        simlab.execute(f'''<MoveSubModelBodiesToRootModel UUID="0619e34b-2275-40b0-b479-882d179d560b">
+          <BodiesToMove><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></BodiesToMove>
+         </MoveSubModelBodiesToRootModel>''')
+        print(f"  OK {BODY_NAME} moved to root of {mesh_model}")
+    else:
+        print(f"  WARNING: No SM model found to move the body to root.")
+
+    print(f"\n============================================================")
+    print(f"  {BODY_NAME} complete!")
+    print(f"============================================================")

@@ -1,0 +1,25 @@
+# Summary of Windows Fixes
+
+I have fully resolved the issues that made the application appear unresponsive and prevented the CLI from working correctly on standard Windows terminals.
+
+## What Changed
+
+### 1. GUI Progress Feedback
+**Files changed**: `gui/app.py`
+- When you click "Process", the **Debug Console** now pops open automatically. This ensures you can immediately see the backend progress logs (e.g. `[Phase 1] Running Topological Heuristic Filters...`) instead of staring at a seemingly frozen screen.
+- The single-file processing progress bar is now correctly configured to an "indeterminate" animated state while processing is ongoing, only jumping to 100% when the backend engine successfully finishes the file.
+
+### 2. Export Bug
+**Files changed**: `gui/worker.py`
+- There was a typo in how the worker thread attempted to load the CAD exporter, which would cause an error when trying to export renamed STEP files from a loaded run. I corrected the import from `core.step_exporter` to `engine.step_exporter`.
+
+### 3. Windows Terminal Unicode Crash
+**Files changed**: `main.py`, `engine/inference_engine.py`
+- **The underlying issue**: By default, Python on standard Windows Command Prompt or PowerShell limits console output encoding (`cp1252`). Since the backend scripts utilize modern terminal emojis (🚀, ❌, etc.) for logging, Python was crashing *immediately* before even processing the files.
+- **The fix**: I injected an automatic Unicode reconfiguration override `sys.stdout.reconfigure(encoding='utf-8')` to the entry points. This ensures you can now freely run `python main.py ...` on Windows without encountering `UnicodeEncodeError`.
+
+## How to Test
+You can now confidently test the application.
+1. Run `python gui/app.py`.
+2. Load a CAD file (e.g., `prime.STEP`).
+3. Hit **Process**. Notice how the Debug Console now appears instantly and displays the engine's internal progress.

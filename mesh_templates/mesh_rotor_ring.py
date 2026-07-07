@@ -17,7 +17,13 @@ def run(BODY_NAME, config):
         val = config.get(key)
         return val if val is not None else default
 
+    _all_mdls = simlab.getAllRootModelNames("all")
     MODEL = "$Geometry"
+    if _all_mdls:
+        for m in _all_mdls:
+            if not m.endswith(".gda") and "_SM" not in m:
+                MODEL = m
+                break
     mesh_size = _v('global.mesh_size', 4.0)
     surf_mesh_size = _v('global.surf_mesh_size', 4.0)
     vol_mesh_size = _v('global.vol_mesh_size', 4.0)
@@ -65,7 +71,7 @@ def run(BODY_NAME, config):
 
     all_models = simlab.getAllRootModelNames("all")
     mesh_model = next((m for m in all_models if m != MODEL and
-                       ("_SM" in m or m.endswith(".gda"))), None)
+                       ("_SM" in m or m.endswith(".gda"))), MODEL)
     print(f"  Mesh model: {mesh_model}")
 
     # ===============================================================
@@ -93,27 +99,44 @@ def run(BODY_NAME, config):
     # PHASE 3: VOLUME MESH
     # ===============================================================
     print(f"\n-- PHASE 3: Volume Mesh ({mesh_type}) ----------------------")
-    tet_type = "Tet4" if mesh_type == "Tet4" else "Tet10StraightEdge"
-    simlab.execute(f'''<TetMesher UUID="83822e68-12bb-43b9-b2ac-77e0b9ea5149">
-      <tag Value="-1"/>
-      <Name Value="{BODY_NAME}_TetMesh_{mesh_type}"/>
-      <SupportEntities><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></SupportEntities>
-      <MeshType Value="{tet_type}"/>
-      <AverageElemSize Value="{vol_mesh_size} mm"/>
-      <MaxElemSize Checked="0" Value="0"/><InternalGrading Value="{int(_v('volume.internal_grading', 2.0))}"/>
-      <MinQuality Value="{_v('volume.min_quality', 0.12)}"/><LinearQuality Value="2"/><MaxQuality Value="1"/>
-      <QuadMinQuality Value="0.001"/><QuadQuality Value="0"/><QuadMaxQuality Value="1"/>
-      <CadBody Value="0"/><IdentifyFeaturesAndMesh Checked="0"/>
-      <MergeTinyFillets Checked="0"/><CreateMatchingMesh Checked="0"/>
-      <TransferMeshcontrolFromCAD Checked="0"/>
-      <AdvancedOptions>
-       <MeshDensity Value="0"/><CreateNewMeshModel Checked="0"/>
-       <OutputModelName Value=""/><Assembly Value="0"/><MeshAsSingleBody Value="0"/>
-       <Retain2DSurfaceBodies Value="0"/><FillCavity Value="1"/><MixedMesh Value="0"/>
-       <PreserveFaceMesh Value="0"/><StraightenEdges Checked="1"/>
-       <PreserveSurfaceSkew Checked="0" Value="55"/>
-      </AdvancedOptions>
-     </TetMesher>''')
+    if mesh_type in ("Tet4", "Tet10"):
+        tet_type = "Tet4" if mesh_type == "Tet4" else "Tet10StraightEdge"
+        simlab.execute(f'''<TetMesher UUID="83822e68-12bb-43b9-b2ac-77e0b9ea5149">
+          <tag Value="-1"/>
+          <Name Value="{BODY_NAME}_TetMesh_{mesh_type}"/>
+          <SupportEntities><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></SupportEntities>
+          <MeshType Value="{tet_type}"/>
+          <AverageElemSize Value="{vol_mesh_size} mm"/>
+          <MaxElemSize Checked="0" Value="0"/><InternalGrading Value="{int(_v('volume.internal_grading', 2.0))}"/>
+          <MinQuality Value="{_v('volume.min_quality', 0.12)}"/><LinearQuality Value="2"/><MaxQuality Value="1"/>
+          <QuadMinQuality Value="0.001"/><QuadQuality Value="0"/><QuadMaxQuality Value="1"/>
+          <CadBody Value="0"/><IdentifyFeaturesAndMesh Checked="0"/>
+          <MergeTinyFillets Checked="0"/><CreateMatchingMesh Checked="0"/>
+          <TransferMeshcontrolFromCAD Checked="0"/>
+          <AdvancedOptions>
+           <MeshDensity Value="0"/><CreateNewMeshModel Checked="0"/>
+           <OutputModelName Value=""/><Assembly Value="0"/><MeshAsSingleBody Value="0"/>
+           <Retain2DSurfaceBodies Value="0"/><FillCavity Value="1"/><MixedMesh Value="0"/>
+           <PreserveFaceMesh Value="0"/><StraightenEdges Checked="1"/>
+           <PreserveSurfaceSkew Checked="0" Value="55"/>
+          </AdvancedOptions>
+         </TetMesher>''')
+
+    elif mesh_type == "Hex":
+        simlab.execute(f''' <AutoHexMesh UUID="f4ce8a5e-4df8-42de-ab98-547a83e9d7c2">
+          <InputBodies>
+           <Entities>
+            <Model>{mesh_model}</Model>
+            <Body>"{BODY_NAME}",</Body>
+           </Entities>
+          </InputBodies>
+          <AverageElementSize Value="{vol_mesh_size} mm"/>
+          <MinimumElementSize Value="{vol_mesh_size*0.1:.3f} mm"/>
+          <AllowQuadMeshTransition Checked="0"/>
+          <CreateMeshInNewModel Checked="0"/>
+          <CreateRingAlongCircleAndSlot Checked="1"/>
+          <AvoidSpiderWedgeAlongAxis Checked="0"/>
+         </AutoHexMesh>''')
     print(f"  OK {mesh_type} volume mesh done")
 
     # ===============================================================

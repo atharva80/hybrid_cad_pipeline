@@ -1,0 +1,7 @@
+- `[/]` Initialize Task
+- `[ ]` Fix GUI (`gui/app.py`) to show debug console on process and use indeterminate progress bar for single files
+- `[ ]` Fix incorrect export import in `gui/worker.py`
+- `[ ]` Add UTF-8 stdout reconfiguration in `main.py`
+- `[ ]` Add UTF-8 stdout reconfiguration in `engine/inference_engine.py`
+- `[ ]` Verify changes with GUI test
+- `[ ]` Verify changes with CLI test

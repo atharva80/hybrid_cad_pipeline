@@ -1,0 +1,6 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "A detailed plan to replace the hardcoded Python template injection system with a JSON-driven mesh configuration system. When a user clicks a component name in the Meshing Tab, a side panel opens showing all its tunable parameters (IsoLine radii, axial/circumferential elements, quality thresholds, etc.) loaded from a JSON config file. The user edits values visually, and the app generates the API payload from the JSON at dispatch time rather than injecting regex into a Python string.",
+  "updatedAt":  "2026-07-02T06:26:03.341313301Z",
+  "requestFeedback":  true
+}

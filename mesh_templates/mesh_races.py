@@ -20,7 +20,13 @@ def run(BODY_NAME, config):
         val = config.get(key)
         return val if val is not None else default
 
+    _all_mdls = simlab.getAllRootModelNames("all")
     MODEL = "$Geometry"
+    if _all_mdls:
+        for m in _all_mdls:
+            if not m.endswith(".gda") and "_SM" not in m:
+                MODEL = m
+                break
     mesh_size = _v('global.mesh_size', 4.0)
     surf_mesh_size = _v('global.surf_mesh_size', 4.0)
     vol_mesh_size = _v('global.vol_mesh_size', 4.0)
@@ -126,27 +132,44 @@ def run(BODY_NAME, config):
      </QCheck>''')
 
     def volume_mesh(mesh_model, body_str, label, size, mtype):
-        tet_type = "Tet4" if mtype == "Tet4" else "Tet10StraightEdge"
-        simlab.execute(f'''<TetMesher UUID="83822e68-12bb-43b9-b2ac-77e0b9ea5149">
-      <tag Value="-1"/>
-      <Name Value="{label}_TetMesh_{mtype}"/>
-      <SupportEntities><Entities><Model>{mesh_model}</Model><Body>{body_str}</Body></Entities></SupportEntities>
-      <MeshType Value="{tet_type}"/>
-      <AverageElemSize Value="{size} mm"/>
-      <MaxElemSize Checked="0" Value="0"/><InternalGrading Value="{int(_v('volume.internal_grading', 2.0))}"/>
-      <MinQuality Value="{_v('volume.min_quality', 0.12)}"/><LinearQuality Value="2"/><MaxQuality Value="1"/>
-      <QuadMinQuality Value="0.001"/><QuadQuality Value="0"/><QuadMaxQuality Value="1"/>
-      <CadBody Value="0"/><IdentifyFeaturesAndMesh Checked="0"/>
-      <MergeTinyFillets Checked="0"/><CreateMatchingMesh Checked="0"/>
-      <TransferMeshcontrolFromCAD Checked="0"/>
-      <AdvancedOptions>
-       <MeshDensity Value="0"/><CreateNewMeshModel Checked="0"/>
-       <OutputModelName Value=""/><Assembly Value="0"/><MeshAsSingleBody Value="0"/>
-       <Retain2DSurfaceBodies Value="0"/><FillCavity Value="1"/><MixedMesh Value="0"/>
-       <PreserveFaceMesh Value="0"/><StraightenEdges Checked="1"/>
-       <PreserveSurfaceSkew Checked="0" Value="55"/>
-      </AdvancedOptions>
-     </TetMesher>''')
+        if mesh_type in ("Tet4", "Tet10"):
+            tet_type = "Tet4" if mtype == "Tet4" else "Tet10StraightEdge"
+            simlab.execute(f'''<TetMesher UUID="83822e68-12bb-43b9-b2ac-77e0b9ea5149">
+              <tag Value="-1"/>
+              <Name Value="{label}_TetMesh_{mtype}"/>
+              <SupportEntities><Entities><Model>{mesh_model}</Model><Body>{body_str}</Body></Entities></SupportEntities>
+              <MeshType Value="{tet_type}"/>
+              <AverageElemSize Value="{size} mm"/>
+              <MaxElemSize Checked="0" Value="0"/><InternalGrading Value="{int(_v('volume.internal_grading', 2.0))}"/>
+              <MinQuality Value="{_v('volume.min_quality', 0.12)}"/><LinearQuality Value="2"/><MaxQuality Value="1"/>
+              <QuadMinQuality Value="0.001"/><QuadQuality Value="0"/><QuadMaxQuality Value="1"/>
+              <CadBody Value="0"/><IdentifyFeaturesAndMesh Checked="0"/>
+              <MergeTinyFillets Checked="0"/><CreateMatchingMesh Checked="0"/>
+              <TransferMeshcontrolFromCAD Checked="0"/>
+              <AdvancedOptions>
+               <MeshDensity Value="0"/><CreateNewMeshModel Checked="0"/>
+               <OutputModelName Value=""/><Assembly Value="0"/><MeshAsSingleBody Value="0"/>
+               <Retain2DSurfaceBodies Value="0"/><FillCavity Value="1"/><MixedMesh Value="0"/>
+               <PreserveFaceMesh Value="0"/><StraightenEdges Checked="1"/>
+               <PreserveSurfaceSkew Checked="0" Value="55"/>
+              </AdvancedOptions>
+             </TetMesher>''')
+
+        elif mesh_type == "Hex":
+            simlab.execute(f''' <AutoHexMesh UUID="f4ce8a5e-4df8-42de-ab98-547a83e9d7c2">
+              <InputBodies>
+               <Entities>
+                <Model>{mesh_model}</Model>
+                <Body>{body_str}</Body>
+               </Entities>
+              </InputBodies>
+              <AverageElementSize Value="{size} mm"/>
+              <MinimumElementSize Value="{size*0.1:.3f} mm"/>
+              <AllowQuadMeshTransition Checked="0"/>
+              <CreateMeshInNewModel Checked="0"/>
+              <CreateRingAlongCircleAndSlot Checked="1"/>
+              <AvoidSpiderWedgeAlongAxis Checked="0"/>
+             </AutoHexMesh>''')
 
     def merge_bodies(body_names, output_name, model):
         body_str = "".join(f'"{b}",' for b in body_names)
@@ -158,6 +181,19 @@ def run(BODY_NAME, config):
       <RedoFlag Value=""/><Output/>
      </BodyMerge>''')
         print(f"  OK Merged -> '{output_name}'")
+
+    def rename_body(model, old_name, new_name):
+        simlab.execute(f'''<RenameBody UUID="78633e0d-3d2f-4e9a-b075-7bff122772d8">
+      <SupportEntities>
+       <Entities>
+        <Model>{model}</Model>
+        <Body>"{old_name}",</Body>
+       </Entities>
+      </SupportEntities>
+      <NewName Value="{new_name}"/>
+      <Output/>
+     </RenameBody>''')
+        print(f"  OK Renamed '{old_name}' -> '{new_name}'")
 
     def move_to_root(mesh_model, body_name):
         simlab.execute(f'''<MoveSubModelBodiesToRootModel UUID="0619e34b-2275-40b0-b479-882d179d560b">
@@ -173,7 +209,7 @@ def run(BODY_NAME, config):
     def get_mesh_model():
         all_models = simlab.getAllRootModelNames("all")
         return next((m for m in all_models if m != MODEL and
-                     ("_SM" in m or m.endswith(".gda"))), None)
+                     ("_SM" in m or m.endswith(".gda"))), MODEL)
 
     def get_bodies_from_mesh(mesh_model, prefix):
         """Get body names matching prefix from MESH model only."""
@@ -234,9 +270,11 @@ def run(BODY_NAME, config):
         volume_mesh(mesh_model, outer_vm_str, f"{BODY_NAME}_OUTER", mesh_size, mesh_type)
         print("  OK Volume mesh done")
 
-        print("\n  -- Merge -> OUTER_RACE --")
+        print("\n  -- Merge/Rename -> OUTER_RACE --")
         if len(outer_vm) >= 2:
             merge_bodies(outer_vm, f"{BODY_NAME}_OUTER", mesh_model)
+        elif len(outer_vm) == 1:
+            rename_body(mesh_model, outer_vm[0], f"{BODY_NAME}_OUTER")
         
         print("\n  -- Move to Root --")
         move_to_root(mesh_model, f"{BODY_NAME}_OUTER")
@@ -276,9 +314,11 @@ def run(BODY_NAME, config):
         volume_mesh(mesh_model, mid_vm_str, f"{BODY_NAME}_MID", mesh_size, mesh_type)
         print("  OK Volume mesh done")
 
-        print("\n  -- Merge -> MID_RACE --")
+        print("\n  -- Merge/Rename -> MID_RACE --")
         if len(mid_vm) >= 2:
             merge_bodies(mid_vm, f"{BODY_NAME}_MID", mesh_model)
+        elif len(mid_vm) == 1:
+            rename_body(mesh_model, mid_vm[0], f"{BODY_NAME}_MID")
 
         print("\n  -- Move to Root --")
         move_to_root(mesh_model, f"{BODY_NAME}_MID")
@@ -318,9 +358,11 @@ def run(BODY_NAME, config):
         volume_mesh(mesh_model, inner_vm_str, f"{BODY_NAME}_INNER", mesh_size, mesh_type)
         print("  OK Volume mesh done")
 
-        print("\n  -- Merge -> INNER_RACE --")
+        print("\n  -- Merge/Rename -> INNER_RACE --")
         if len(inner_vm) >= 2:
             merge_bodies(inner_vm, f"{BODY_NAME}_INNER", mesh_model)
+        elif len(inner_vm) == 1:
+            rename_body(mesh_model, inner_vm[0], f"{BODY_NAME}_INNER")
 
         print("\n  -- Move to Root --")
         move_to_root(mesh_model, f"{BODY_NAME}_INNER")

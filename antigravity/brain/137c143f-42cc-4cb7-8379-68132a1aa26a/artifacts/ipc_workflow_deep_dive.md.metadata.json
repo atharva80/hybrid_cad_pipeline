@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary":  "A deep-dive explanation of the ATLAS to SimLab IPC workflow, detailing the lifecycle from CAD import to TCP API server boot, payload serialization, and thread-safe mesh execution.",
+  "updatedAt":  "2026-07-02T05:47:35.704314317Z"
+}

@@ -1,0 +1,4 @@
+- `[/]` Implement Threading IPC Engine
+  - `[ ]` Remove the PySide QTimer from the SimLab macro injection in `gui/app.py`.
+  - `[ ]` Replace with a `threading.Thread` daemon that loops infinitely.
+  - `[ ]` Notify user to test the daemon thread.

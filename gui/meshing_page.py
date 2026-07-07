@@ -12,6 +12,7 @@ class MeshingPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._active_comp = None
         root_layout = QHBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
@@ -36,7 +37,7 @@ class MeshingPage(QWidget):
         # Global Controls (kept for "Mesh All" fallback)
         header.addWidget(QLabel("Global Type:"))
         self.g_type = QComboBox()
-        self.g_type.addItems(["Tet4", "Tet10"])
+        self.g_type.addItems(["Tet4", "Tet10", "Hex"])
         self.g_type.setStyleSheet(f"background: {C['surface']}; color: {C['text']}; padding: 6px; border-radius: 4px; min-width: 80px;")
         header.addWidget(self.g_type)
 
@@ -62,15 +63,17 @@ class MeshingPage(QWidget):
         layout.addWidget(hint)
 
         # Table
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Component Name", "Mesh Type", "Mesh Size (mm)", "Action"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["Component Name", "Mesh Type", "Mesh Size", "Status", "Action"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
-        self.table.setColumnWidth(1, 140)
-        self.table.setColumnWidth(2, 140)
-        self.table.setColumnWidth(3, 140)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+        self.table.setColumnWidth(1, 100)
+        self.table.setColumnWidth(2, 100)
+        self.table.setColumnWidth(3, 100)
+        self.table.setColumnWidth(4, 100)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -106,6 +109,7 @@ class MeshingPage(QWidget):
         self.config_panel.setFixedWidth(340)
         self.config_panel.setStyleSheet(f"background: {C['bg']}; border-left: 1px solid {C['border']};")
         self.config_panel.meshRequested.connect(self._on_panel_mesh)
+        self.config_panel.hide()
         root_layout.addWidget(self.config_panel)
 
     # ── Population ────────────────────────────────────────────────
@@ -123,7 +127,7 @@ class MeshingPage(QWidget):
             self.table.setItem(row, 0, item)
 
             c_type = QComboBox()
-            c_type.addItems(["Tet4", "Tet10"])
+            c_type.addItems(["Tet4", "Tet10", "Hex"])
             c_type.setStyleSheet(f"background: {C['bg']}; color: {C['text']}; padding: 6px; border-radius: 4px;")
             self.table.setCellWidget(row, 1, c_type)
 
@@ -134,6 +138,12 @@ class MeshingPage(QWidget):
             c_size.setStyleSheet(f"background: {C['bg']}; color: {C['text']}; padding: 6px; border-radius: 4px;")
             self.table.setCellWidget(row, 2, c_size)
 
+            # Status Label
+            status_lbl = QLabel("Ready")
+            status_lbl.setAlignment(Qt.AlignCenter)
+            status_lbl.setStyleSheet("color: #7F8C8D; font-weight: bold; font-style: italic;")
+            self.table.setCellWidget(row, 3, status_lbl)
+
             btn_container = QWidget()
             b_layout = QHBoxLayout(btn_container)
             b_layout.setContentsMargins(0, 0, 0, 0)
@@ -142,15 +152,43 @@ class MeshingPage(QWidget):
             btn.clicked.connect(lambda _, r=row, c=comp: self._direct_mesh(r, c))
             b_layout.addWidget(btn)
             b_layout.setAlignment(Qt.AlignCenter)
-            self.table.setCellWidget(row, 3, btn_container)
+            self.table.setCellWidget(row, 4, btn_container)
             self.table.setRowHeight(row, 60)
+
+    def update_status(self, comp_name, status):
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item and item.text().strip() == comp_name.strip():
+                lbl = self.table.cellWidget(row, 3)
+                if lbl:
+                    lbl.setText(status)
+                    if status == "Meshing...":
+                        lbl.setStyleSheet("color: #F39C12; font-weight: bold;")
+                    elif status == "Success":
+                        lbl.setStyleSheet("color: #2ECC71; font-weight: bold;")
+                    elif status == "Failed":
+                        lbl.setStyleSheet("color: #E74C3C; font-weight: bold;")
+                    else:
+                        lbl.setStyleSheet("color: #7F8C8D; font-weight: bold; font-style: italic;")
+                break
 
     # ── Slots ─────────────────────────────────────────────────────
 
     def _on_right_click(self, pos):
         item = self.table.itemAt(pos)
         if item and item.column() == 0:
-            self._open_config(item.text())
+            comp_name = item.text()
+            if self.config_panel.isVisible():
+                if self._active_comp == comp_name:
+                    self.config_panel.hide()
+                    self._active_comp = None
+                else:
+                    self._active_comp = comp_name
+                    self._open_config(comp_name)
+            else:
+                self.config_panel.show()
+                self._active_comp = comp_name
+                self._open_config(comp_name)
 
     def _direct_mesh(self, row, comp_name):
         c_type = self.table.cellWidget(row, 1).currentText()

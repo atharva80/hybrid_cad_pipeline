@@ -1,0 +1,79 @@
+{
+  "SHAFT_TO_STATOR": {
+    "master": "SHAFT",
+    "slave": "STATOR",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "SHAFT_TO_TOP_INNER_RACE": {
+    "master": "SHAFT",
+    "slave": "BEARING_TOP_INNER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "SHAFT_TO_BOTTOM_INNER_RACE": {
+    "master": "SHAFT",
+    "slave": "BEARING_BOTTOM_INNER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "TOP_INNER_RACE_TO_TOP_MID_RACE": {
+    "master": "BEARING_TOP_MID",
+    "slave": "BEARING_TOP_INNER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "BOTTOM_INNER_RACE_TO_BOTTOM_MID_RACE": {
+    "master": "BEARING_BOTTOM_MID",
+    "slave": "BEARING_BOTTOM_INNER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "TOP_MID_RACE_TO_TOP_OUTER_RACE": {
+    "master": "BEARING_TOP_OUTER",
+    "slave": "BEARING_TOP_MID",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "BOTTOM_MID_RACE_TO_BOTTOM_OUTER_RACE": {
+    "master": "BEARING_BOTTOM_OUTER",
+    "slave": "BEARING_BOTTOM_MID",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "TOP_OUTER_RACE_TO_TOP_COVER": {
+    "master": "TOP_COVER",
+    "slave": "BEARING_TOP_OUTER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "BOTTOM_OUTER_RACE_TO_TOP_COVER": {
+    "master": "TOP_COVER",
+    "slave": "BEARING_BOTTOM_OUTER",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "STATOR_TO_PCB_BRACKET": {
+    "master": "STATOR",
+    "slave": "PCB_BRACKET",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  },
+  "TOP_COVER_TO_ROTOR_RING": {
+    "master": "TOP_COVER",
+    "slave": "ROTOR_RING",
+    "tolerance": 0.05,
+    "contact_type": "Tied (Type 2)",
+    "solver": "Radioss"
+  }
+}

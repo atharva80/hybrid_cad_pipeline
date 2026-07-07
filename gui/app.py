@@ -13,6 +13,7 @@ from PySide6.QtGui import *
 from gui.styles import C, SS, COMPONENT_COLORS, ML_COMPONENTS
 from gui.worker import InferenceWorker
 from gui.meshing_page import MeshingPage
+from gui.contacts_page import ContactsPage
 
 # ── Segmented nav button ───────────────────────────────────────────────────
 class NavBtn(QPushButton):
@@ -220,7 +221,7 @@ class ImportPage(QWidget):
         
         cfg_header.addStretch()
         
-        non_core = sorted(['PCB_BOX', 'PCB_BRACKET', 'STAYCAP', 'BLADE_BOX', 'FALSE_COVER', 'MASTER_BOX', 'MOTOR_BOX'])
+        non_core = sorted(['PCB_BOX', 'PCB_BRACKET', 'STAYCAP', 'BLADE_BOX', 'FALSE_COVER', 'MASTER_BOX', 'MOTOR_BOX', 'CANOPY', 'SIDE_COVER'])
         self.additional_dropdown = MultiSelectDropdown("Additional Components", non_core)
         cfg_header.addWidget(self.additional_dropdown)
         
@@ -621,6 +622,9 @@ class ResultsPage(QWidget):
         self.simlab_btn = QPushButton("Open in SimLab")
         self.simlab_btn.setStyleSheet("background: #2E7D52; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; font-size: 12px;")
         
+        self.skip_simlab_btn = QPushButton("Open Meshing (Already Open)")
+        self.skip_simlab_btn.setStyleSheet("background: #F39C12; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; font-size: 12px;")
+        
         self.remove_btn = QPushButton("Remove Selected")
         self.remove_btn.setObjectName("danger_btn")
         self.remove_btn.hide()
@@ -630,6 +634,8 @@ class ResultsPage(QWidget):
         header.addWidget(self.export_btn)
         header.addSpacing(8)
         header.addWidget(self.simlab_btn)
+        header.addSpacing(8)
+        header.addWidget(self.skip_simlab_btn)
         header.addSpacing(8)
         header.addWidget(self.remove_btn)
 
@@ -953,9 +959,10 @@ class App(QMainWindow):
         self.import_page  = ImportPage()
         self.results_page = ResultsPage()
         self.meshing_page = MeshingPage()
-        for p in [self.import_page, self.results_page, self.meshing_page]: self._pages_w.addWidget(p)
+        self.contacts_page = ContactsPage()
+        for p in [self.import_page, self.results_page, self.meshing_page, self.contacts_page]: self._pages_w.addWidget(p)
 
-        for i, label in enumerate(["Import", "Results", "Meshing"]):
+        for i, label in enumerate(["Import", "Results", "Meshing", "Contacts"]):
             btn = NavBtn(label)
             btn.clicked.connect(lambda _, idx=i: self._switch_page(idx))
             nav_layout.addWidget(btn)
@@ -968,23 +975,22 @@ class App(QMainWindow):
         self.load_btn = QPushButton("Load Run"); self.load_btn.setObjectName("ghost_btn")
         self.debug_toggle = QPushButton("Debug"); self.debug_toggle.setObjectName("ghost_btn"); self.debug_toggle.setCheckable(True)
 
+        self.progress = QProgressBar()
+        self.progress.setObjectName("progress")
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(2)
+        
+        self.progress_lbl = QLabel("")
+        self.progress_lbl.setStyleSheet(f"color: {C['text_dim']}; font-style: italic; margin-right: 16px;")
+
+        nav_layout.addWidget(self.progress_lbl)
         nav_layout.addWidget(self.opt_render)
         nav_layout.addWidget(self.load_btn)
         nav_layout.addSpacing(16)
         nav_layout.addWidget(self.debug_toggle)
 
-        self.progress = QProgressBar(); self.progress.setObjectName("progress")
-        self.progress.setTextVisible(False)
-        self.progress_lbl = QLabel("")
-        self.progress_lbl.setStyleSheet(f"color: {C['text_dim']}")
-        
-        prog_layout = QHBoxLayout()
-        prog_layout.setContentsMargins(0, 0, 0, 0)
-        prog_layout.addWidget(self.progress, 1)
-        prog_layout.addWidget(self.progress_lbl)
-
         root.addWidget(nav)
-        root.addLayout(prog_layout)
+        root.addWidget(self.progress)
         root.addWidget(self._pages_w, 1)
 
         self.debug_console = DebugConsole()
@@ -995,6 +1001,7 @@ class App(QMainWindow):
         self.results_page.save_btn.clicked.connect(self._save_run)
         self.results_page.export_btn.clicked.connect(self._export_cads)
         self.results_page.simlab_btn.clicked.connect(self._open_in_simlab)
+        self.results_page.skip_simlab_btn.clicked.connect(self._skip_to_meshing)
         self.debug_toggle.toggled.connect(self.debug_console.setVisible)
         
         self.results_page.correctionRequested.connect(self._handle_correction)
@@ -1002,12 +1009,17 @@ class App(QMainWindow):
         
         self.meshing_page.meshRequested.connect(self._handle_mesh)
         self.meshing_page.meshAllRequested.connect(self._handle_mesh_all)
+        
+        self.contacts_page.contactRequested.connect(self._handle_contact)
+        self.contacts_page.contactAllRequested.connect(self._handle_contact_all)
 
-        # Hide Results and Meshing tabs initially
+        # Hide Results, Meshing, and Contacts tabs initially
         self._nav_btns[1].hide()
         self._nav_btns[2].hide()
+        self._nav_btns[3].hide()
 
         self._switch_page(0)
+        self._start_api_log_watcher()
 
     def _toggle_run(self):
         if self._worker and self._worker.isRunning():
@@ -1253,6 +1265,58 @@ class App(QMainWindow):
         if not self.debug_toggle.isChecked(): self.debug_toggle.setChecked(True)
         self.debug_console.append(f" ERROR:\n{msg}")
 
+    def _start_api_log_watcher(self):
+        import os
+        self._api_log_path = os.path.join(_ROOT, "_cache", "api_server.log")
+        self._api_log_pos = 0
+        if os.path.exists(self._api_log_path):
+            self._api_log_pos = os.path.getsize(self._api_log_path)
+            
+        self._api_log_timer = QTimer(self)
+        self._api_log_timer.timeout.connect(self._poll_api_log)
+        self._api_log_timer.start(500)
+        self._active_api_job = None
+
+    def _poll_api_log(self):
+        import os, re
+        if not os.path.exists(self._api_log_path): return
+        
+        try:
+            size = os.path.getsize(self._api_log_path)
+            if size == self._api_log_pos: return
+            if size < self._api_log_pos: self._api_log_pos = 0
+            
+            with open(self._api_log_path, 'r', encoding='utf-8') as f:
+                f.seek(self._api_log_pos)
+                new_data = f.read()
+                self._api_log_pos = f.tell()
+                
+            for line in new_data.split('\n'):
+                line = line.strip()
+                if not line: continue
+                
+                # Check for job start
+                match = re.search(r'Processing mesh: (.*?) with', line)
+                if match:
+                    self._active_api_job = match.group(1).strip()
+                    if hasattr(self, 'meshing_page'):
+                        self.meshing_page.update_status(self._active_api_job, "Meshing...")
+                    self.progress_lbl.setText(f"API: Meshing {self._active_api_job}...")
+                
+                elif "<- EXECUTION COMPLETED SUCCESSFULLY" in line and self._active_api_job:
+                    if hasattr(self, 'meshing_page'):
+                        self.meshing_page.update_status(self._active_api_job, "Success")
+                    self.progress_lbl.setText(f"API: Success {self._active_api_job}")
+                    self._active_api_job = None
+                    
+                elif "<- EXECUTION FAILED" in line and self._active_api_job:
+                    if hasattr(self, 'meshing_page'):
+                        self.meshing_page.update_status(self._active_api_job, "Failed")
+                    self.progress_lbl.setText(f"API: Failed {self._active_api_job}")
+                    self._active_api_job = None
+        except:
+            pass
+
     def _save_run(self):
         name, ok = QInputDialog.getText(self, "Save Run", "Run Name:", text=time.strftime("Run_%Y%m%d_%H%M%S"))
         if not ok or not name.strip(): return
@@ -1401,7 +1465,7 @@ STEP_Import = """ <STEP_Import CheckBox="ON" Type="STEP" UUID="e88f2fcc-2430-4e4
   <FileName HelpStr="File name to be imported." Value="{export_path.replace(chr(92), '/')}" widget="LineEdit"/>
   <Method Value="Convert to Parasolid"/>
   <BodyName Value="1"/>
-  <ReadPartName Value="0"/>
+  <ReadPartName Value="1"/>
   <SketchWireframe Value="0"/>
   <Groups Value="0"/>
   <Imprint Value="0"/>
@@ -1447,7 +1511,9 @@ simlab.execute(STEP_Import)
             session_dir = os.path.dirname(self.current_report_path) if self.current_report_path else None
             renders = self.results_page._renders_map.get(filename, {})
             self.meshing_page.populate(comps, session_dir, renders)
+            self.contacts_page.populate(comps)
             self._nav_btns[2].show()
+            self._nav_btns[3].show()
             self._switch_page(2)
 
             # Show instruction message box (non-blocking if we prefer, but for now just show it after tab switch)
@@ -1459,6 +1525,27 @@ simlab.execute(STEP_Import)
             
         except Exception as e:
             QMessageBox.warning(self, "SimLab Failed", f"Failed to launch SimLab: {e}")
+
+    def _skip_to_meshing(self):
+        idx = self.results_page.sidebar.currentRow()
+        if idx < 0 or idx >= len(self.results_page._filenames): return
+        filename = self.results_page._filenames[idx]
+        
+        self.progress_lbl.setText("Skipping CAD export, opening Meshing Tab...")
+        
+        comps = []
+        if filename in self.results_page._data_map:
+            comps = [res[0] for res in self.results_page._data_map[filename] if res[1]]
+        
+        session_dir = os.path.dirname(self.current_report_path) if self.current_report_path else None
+        renders = self.results_page._renders_map.get(filename, {})
+        
+        self.meshing_page.populate(comps, session_dir, renders)
+        self.contacts_page.populate(comps)
+        
+        self._nav_btns[2].show()
+        self._nav_btns[3].show()
+        self._switch_page(2)
 
     def _load_run(self):
         history_dir = os.path.join(_ROOT, "_run_history")
@@ -1480,9 +1567,22 @@ simlab.execute(STEP_Import)
                 self.opt_render.btn.setStyleSheet(f"color: {C['accent']}; font-weight: bold; text-align: left; background: transparent; border: none; text-decoration: underline;")
                 
             for filename, results in report.get("results", {}).items():
+                flat_results = []
+                for res in results:
+                    comp = res[0]
+                    nodes = res[1]
+                    if len([n for n in nodes if n is not None]) > 1:
+                        valid_idx = 1
+                        for n in nodes:
+                            if n is not None:
+                                flat_results.append((f"{comp}_{valid_idx}", [n], res[2], res[3] if len(res)>3 else False))
+                                valid_idx += 1
+                    else:
+                        flat_results.append(res)
+                
                 # Populate expects: populate(self, step_path, results, records)
                 original_path = report.get("paths", {}).get(filename, filename)
-                self.results_page.populate(original_path, results, [])
+                self.results_page.populate(original_path, flat_results, [])
                 
             for filename, renders in report.get("renders", {}).items():
                 valid_renders = {k: v for k, v in renders.items() if isinstance(v, str) and os.path.exists(v)}
@@ -1513,6 +1613,7 @@ simlab.execute(STEP_Import)
             "ROTOR_RING":   "mesh_rotor_ring.py",
             "PCB_BRACKET":  "mesh_pcb_bracket.py",
             "DISPLAY_PCB":  "mesh_display_pcb.py",
+            "PCB":          "mesh_display_pcb.py",
             "BOTTOM_COVER": "mesh_bottom_cover.py",
             "EPS_PACKAGING":"mesh_EPS.py",
             "BODY":         "mesh_body.py",
@@ -1520,8 +1621,9 @@ simlab.execute(STEP_Import)
 
         # Resolve base name (strip numeric suffix e.g. OUTER_RACE_1 -> OUTER_RACE)
         base_name = comp_name
+        check_name = comp_name.replace(" ", "_").upper()
         for standard in script_map:
-            if comp_name == standard or comp_name.startswith(standard + "_"):
+            if check_name == standard or check_name.startswith(standard + "_"):
                 base_name = standard
                 break
 
@@ -1567,8 +1669,45 @@ simlab.execute(STEP_Import)
         """Dispatch all components using their saved JSON default configs."""
         for comp_name, config in jobs:
             self._handle_mesh(comp_name, config)
+            import time
             time.sleep(0.1)
         self.progress_lbl.setText("Dispatched all mesh jobs")
+
+    def _handle_contact(self, contact_name: str, config: dict):
+        """Dispatch a contact job via TCP to the SimLab API server."""
+        try:
+            import socket, json
+            
+            payload = json.dumps({
+                "task_type": "create_contact",
+                "contact_name": contact_name,
+                "config": config,
+                "scripts_dir": os.path.join(_ROOT, "contact_templates").replace('\\', '/')
+            })
+            
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(5.0)
+                s.connect(('127.0.0.1', 5050))
+                s.sendall(payload.encode('utf-8'))
+                s.close()
+                self.progress_lbl.setText(f"API: Dispatched contact job for {contact_name}")
+            except ConnectionRefusedError:
+                QMessageBox.warning(self, "API Error",
+                    "SimLab API listener is not running!\n"
+                    "Click the 'ATLAS API' button in SimLab first.")
+            except socket.timeout:
+                QMessageBox.warning(self, "API Error",
+                    "Connection to SimLab API timed out!")
+        except Exception as e:
+            QMessageBox.critical(self, "Contact Error", f"Failed to dispatch contact script: {e}")
+
+    def _handle_contact_all(self, jobs):
+        for contact_name, config in jobs:
+            self._handle_contact(contact_name, config)
+            import time
+            time.sleep(0.1)
+        self.progress_lbl.setText("Dispatched all contact jobs")
 
 def main():
     app = QApplication(sys.argv)

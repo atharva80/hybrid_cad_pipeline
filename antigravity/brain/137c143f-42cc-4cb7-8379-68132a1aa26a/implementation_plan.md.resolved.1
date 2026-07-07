@@ -1,0 +1,51 @@
+# Implementation Plan: Contacts Tab Integration
+
+You are completely correct in your vision—the goal is to build an experience exactly like the Meshing tab, but tailored for the "Define Auto Contact" dialog you shared.
+
+## Answering Your Questions
+
+**1. Will this work with the API only? How will it work?**
+Yes, exactly like the meshing tab! 
+1. The ATLAS UI will have a "Contacts" tab.
+2. When you click "Create Contact" (for a suggested or custom contact), the UI builds a JSON payload containing the Master body, Slave body, Tolerance, Friction, etc.
+3. It sends this over the exact same local socket (`localhost:5050`) to the SimLab API server.
+4. The server runs `contact_templates/create_contact.py` in SimLab, injecting your exact parameters to create the contact live.
+
+**2. What is the UUID in these scripts for?**
+In SimLab macros, `UUID="3b4a24b5-6aea-49d3-b74a-82bf5b3ec193"` is a Universally Unique Identifier that SimLab uses internally to map the XML text to the specific "Define Auto Contact" tool. We don't change it; we keep it exactly as it is so SimLab's kernel knows what to do with our command.
+
+---
+
+## Proposed System Design
+
+### 1. The Contacts UI (`gui/contacts_page.py`)
+- **Suggested Contacts Table**: Just like your screenshot, it will list auto-detected pairs (e.g., `SHAFT ↔ STATOR`).
+- **Manual Contact Creator**: A section to select any two components (Main Body / Secondary Body) to define a custom contact.
+- **The Config Side-Panel**: Just like the Meshing tab, if you click on a contact row, a right-side panel will slide out. This panel will expose the advanced settings from your screenshot:
+  - **Tolerance** (Default: 0.3 mm)
+  - **Contact Type** (Default: Friction (Type24))
+  - **Coulomb Friction Coefficient**
+  - **Initial Penetration**
+
+### 2. Configuration Management (`config/contact_config/`)
+- We will store defaults in `default_contacts.json`.
+- When you tweak friction or tolerance for `SHAFT_STATOR` in the side-panel, it saves it so your preferences persist.
+
+### 3. The Universal SimLab Script (`contact_templates/create_contact.py`)
+Instead of hardcoding a macro for every possible pair, we will write **one** python template.
+- It will accept a `config` dictionary from the UI (containing Master, Slave, Tolerance, Friction).
+- It will dynamically construct the `DefineManualContact` XML payload (using the required UUID).
+- It will inject the `CoulombFrictionCoefficient` and `Tolerance` directly into the XML before executing it.
+
+## Open Questions for You
+
+> [!IMPORTANT]
+> 1. **Default Friction**: Do you want the UI to expose a default `CoulombFrictionCoefficient` (e.g., 0.1 or 0.2), or should we leave it blank by default?
+> 2. **Solvers**: Your screenshot shows "Radioss" as the solver. Are we exclusively using the Radioss solver for these explicit contacts, or do I need to add a dropdown for OptiStruct/AcuSolve?
+> 3. **Contact Type**: You have `Friction (Type24)` selected. Is this the only type you use, or should I add a dropdown for `Slide (Type 7)`, `Tied (Type 2)`, etc.?
+
+## Verification Plan
+1. Build the UI tab, side-panel, and universal script.
+2. You will open the ATLAS app, go to the Contacts tab, and see suggested pairs.
+3. You will click a pair, adjust the friction/tolerance in the side-panel, and hit "Create".
+4. We will verify in SimLab that the contact is created with the exact properties you specified.

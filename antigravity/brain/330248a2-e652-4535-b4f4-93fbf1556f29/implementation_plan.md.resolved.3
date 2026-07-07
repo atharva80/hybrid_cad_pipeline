@@ -1,0 +1,33 @@
+# Live Meshing Automation IPC Plan
+
+## The Core Problem
+When we launch SimLab using the command `SimLab.bat -auto simlab_import_macro.py`, SimLab executes the macro **synchronously** during its boot sequence, *before* its main C++ GUI engine and Qt Event Loop are fully initialized. 
+
+Because of this:
+1. **Infinite Loops (`while True`)**: Permanently block SimLab from finishing its boot sequence (the GUI hangs).
+2. **PyQt5 Timers (`QTimer`)**: Either fail to attach to the non-existent event loop, or get instantly garbage-collected by Python the moment the boot script finishes.
+3. **Manual Execution**: Works perfectly because when you hit "Play" in the Automation tab, SimLab is already fully booted and idling on its main event loop.
+
+## Research Findings inside `C:\Program Files\Altair\2025.1`
+I scanned the internal Altair Python libraries (`hwx.simlab` and `hwx.xmlui`). 
+- SimLab does contain undocumented `WebSocketServer` capabilities (mostly used for internal HTML Plotly rendering), but hooking into undocumented proprietary C++ APIs is highly prone to crashing.
+- SimLab does not natively expose a CLI flag to inject scripts into an *already running* session (like a `-run` flag). 
+
+## Proposed Solutions
+
+To achieve **100% automatic** meshing without manual "Play" button clicks, we have two architectural options:
+
+### Option 1: OS-Level Daemon Threading (Recommended)
+Instead of relying on SimLab's PyQt event loop (which is highly volatile during boot), we can inject a native Python OS-level thread (`threading.Thread`) into the `-auto` macro. 
+- **How it works**: The macro launches a background daemon thread that loops infinitely and polls the `_cache/mesh_jobs/` folder. The main script finishes and allows SimLab to boot normally. The background thread survives the boot sequence because it belongs to the OS, not the SimLab GUI loop.
+- **Pros**: 100% automatic.
+- **Cons**: If Altair's `simlab.executeFile()` API is strictly single-threaded (not thread-safe), calling it from a background OS thread might crash SimLab.
+
+### Option 2: The "Listener App" Floating Widget (Bulletproof Fallback)
+If Altair's engine crashes using Option 1, we must obey SimLab's architecture. 
+- **How it works**: We create a tiny PySide window (e.g., a green "Live Meshing Active!" badge). When you click "Open in SimLab" in our main app, it just loads the CAD. Then, you click "Play" on a `Start_Listener.py` script once. That tiny badge stays floating inside SimLab, and *it* handles the live IPC `QTimer` flawlessly.
+- **Pros**: Guaranteed to work without crashing, as it runs on the main thread after boot.
+- **Cons**: Requires one manual click in the Automation tab per SimLab session.
+
+> [!IMPORTANT]
+> I propose we try **Option 1 (Daemon Threading)** first since you specifically want zero-click automation. Do you approve of me updating the macro to use OS-level threading? If it crashes SimLab, we will instantly pivot to Option 2.

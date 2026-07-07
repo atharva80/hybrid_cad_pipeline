@@ -1,0 +1,38 @@
+# Goal: Phase 2 - Meshing Tab & Live SimLab Integration
+
+We will build a dedicated "Meshing" tab in our PySide6 application. It will feature a beautiful, modern UI for controlling mesh parameters, and most importantly, it will feature **Live Execution**. Since our app and SimLab are two different programs, we will establish an Inter-Process Communication (IPC) bridge so that clicking "Mesh" in our app instantly triggers the mesh in the open SimLab window!
+
+## User Review Required
+Please review the IPC Bridge architecture (below). It uses a background timer injected into SimLab to listen for commands without freezing the SimLab GUI.
+
+## Proposed Changes
+
+### 1. IPC Bridge Architecture (The "Listener")
+To control an *already open* SimLab window, our "Open in SimLab" macro needs to be upgraded. Along with importing the CAD, it will silently start a `QTimer` loop running in the background of SimLab.
+- Every 1 second, SimLab will check a hidden folder: `_cache/mesh_jobs/`
+- When you click "Mesh Stator" in our app, our app writes the modified `mesh_stator.py` to that folder.
+- SimLab immediately detects the file, executes it (`simlab.executeFile`), and deletes it. The mesh appears live on screen!
+
+### 2. [MODIFY] gui/app.py - The Meshing UI
+1. **New Tab**: Create `MeshingPage(QWidget)` and add it to the main application stacked widget.
+2. **Unlock Logic**: The tab starts disabled. When "Open in SimLab" is successfully launched, the tab unlocks and becomes the active view.
+3. **UI Layout**:
+   - **Global Bar**: Dropdowns for `Global Mesh Type (Tet4/Tet10)` and `Global Size (mm)` with a sleek "Apply to All" button.
+   - **Component List**: A clean, scrollable grid view mapping every identified component in the active run. Each row contains:
+     - Component Name
+     - Mesh Type Dropdown
+     - Mesh Size Spinbox
+     - Play Icon Button (to mesh individually)
+   - **Footer Action**: A large, primary "Mesh All Components" button to dispatch all scripts in sequence.
+
+### 3. [MODIFY] gui/app.py - Mesh Execution Engine
+Port the regex-replacement logic from your scratch `simlab_gui.py`:
+- Map components to their respective scripts in `EXISTING_SCRIPTS/MESHING/` (e.g., `TOP_COVER -> mesh_top_cover_complete.py`).
+- Read the python script, dynamically regex replace `mesh_type` and `mesh_size` variables based on user UI selections.
+- Drop the finalized script into `_cache/mesh_jobs/` to trigger the live SimLab listener.
+
+## Verification Plan
+1. Launch PySide6 GUI and process a CAD.
+2. Click "Open in SimLab". Ensure SimLab opens and the new "Meshing" tab unlocks in our GUI.
+3. Adjust the size for the `STATOR` and click Mesh.
+4. Verify that SimLab instantly begins meshing the stator in the background.

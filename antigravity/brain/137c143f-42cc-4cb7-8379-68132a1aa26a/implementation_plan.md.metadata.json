@@ -1,0 +1,7 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary":  "Implementation plan detailing the default tolerances, contact types, and suggested CAD component pairs for the Contacts Tab.",
+  "updatedAt":  "2026-07-02T11:23:32.303973478Z",
+  "version":  "2",
+  "requestFeedback":  true
+}

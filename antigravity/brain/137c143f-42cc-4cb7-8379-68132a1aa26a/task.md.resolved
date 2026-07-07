@@ -1,0 +1,5 @@
+- [ ] Create `config/contact_config/default_contacts.json`
+- [ ] Create `contact_templates/create_contact.py`
+- [ ] Implement `gui/contact_config_panel.py`
+- [ ] Implement `gui/contacts_page.py`
+- [ ] Integrate into `gui/app.py`

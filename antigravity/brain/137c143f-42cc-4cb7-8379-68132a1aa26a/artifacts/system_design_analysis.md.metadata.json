@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "A detailed architectural analysis of the ATLAS Hybrid CAD Pipeline, covering the current system design, data flows, IPC architecture, and a prioritized list of high-level improvements. Covers the 6-phase inference pipeline, GUI architecture, the SimLab TCP API bridge, file storage model, and improvement areas including API robustness, session state management, and operator controls.",
+  "updatedAt":  "2026-07-01T18:57:51.961687707Z"
+}

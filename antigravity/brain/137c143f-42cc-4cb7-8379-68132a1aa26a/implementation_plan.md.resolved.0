@@ -1,0 +1,46 @@
+# Implementation Plan: Contacts Tab Integration
+
+Based on the provided `contact_shaft_stator.py` macro, generating contacts in SimLab is straightforward: it requires passing a Master body, Slave body, and a Tolerance value into the `DefineManualContact` XML command. 
+
+Here is the comprehensive plan to build the Contacts Tab feature into the ATLAS UI.
+
+## Proposed Changes
+
+### 1. Data Flow & SimLab Scripting
+Instead of writing a separate python script for every single contact pair (e.g., `contact_shaft_stator.py`, `contact_shaft_rotor.py`), we will create **one universal dynamic script**.
+
+#### [NEW] `contact_templates/create_contact.py`
+- We will refactor the macro into a universal `run(contact_name, config)` template.
+- The `config` dictionary will contain the `MasterEntity`, `SlaveEntity`, and `Tolerance`.
+- The script will dynamically fetch the active mesh model and inject these variables into the `DefineManualContact` SimLab macro.
+
+### 2. UI Updates (`gui/app.py` & `gui/contacts_page.py`)
+We will build a new tab in the ATLAS UI specifically for managing these connections.
+
+#### [NEW] `gui/contacts_page.py`
+- **Table View**: A table listing automatically suggested contact pairs (e.g., `SHAFT ↔ STATOR`, `BEARING_TOP_INNER ↔ SHAFT`).
+- **Columns**: `Contact Name`, `Master Body`, `Slave Body`, `Tolerance (mm)`, and an `Action` button to directly push the contact to SimLab.
+- **Smart Suggestions**: When the tab is populated, we will cross-reference the available CAD bodies. If the CAD contains a `SHAFT` and a `STATOR`, it will automatically suggest a `SHAFT_STATOR` contact row.
+- **Add Custom Contact**: A button allowing the user to define a manual contact pair between any two components that were exported.
+
+#### [MODIFY] `gui/app.py`
+- Add a 4th step to the sidebar navigation: **"Contacts"**.
+- Wire up the `ContactsPage` so it inherits the list of components that were exported to SimLab.
+- Create a new dispatch handler (`_handle_contact_creation`) that sends the contact payload over the TCP socket to the API listener. It will use the exact same socket bridge we stabilized today, just pointing the `scripts_dir` to `contact_templates`.
+
+### 3. Configuration Management
+#### [NEW] `config/contact_config/default_contacts.json`
+- We will store the default tolerances and friction coefficients for contacts here, so they can be tweaked without altering code, keeping with the config-driven architecture.
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **Default Tolerance**: The macro recorded `0.318894 mm`. Should we default to `0.3 mm` for all contacts, or do certain pairs (like bearings) need much tighter tolerances (e.g., `0.1 mm`)?
+> 2. **Master/Slave Logic**: Does it matter to you which component is the "Master" and which is the "Slave" (e.g. should the stiffer/larger body always be the Master)? If so, I will add logic to auto-sort them.
+> 3. **Auto-Meshing Requirement**: Should the UI enforce that components are *meshed* before allowing a contact to be created, or does SimLab allow contacts to be defined on CAD faces before the volume mesh is generated?
+
+## Verification Plan
+1. Create the `create_contact.py` template and the new UI tab.
+2. Launch ATLAS and verify the Contacts Tab appears and populates with logical suggestions based on the imported STEP file.
+3. Click "Create" on the `SHAFT_STATOR` contact.
+4. Verify via the API log that SimLab receives the command and successfully creates the contact entity in the SimLab browser.
