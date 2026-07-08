@@ -1616,18 +1616,31 @@ simlab.execute(STEP_Import)
             "PCB":          "mesh_display_pcb.py",
             "BOTTOM_COVER": "mesh_bottom_cover.py",
             "EPS_PACKAGING":"mesh_EPS.py",
+            "FALSE_COVER":  "mesh_false_cover.py",
+            "CANOPY":       "mesh_canopies.py",
             "BODY":         "mesh_body.py",
         }
 
         # Resolve base name (strip numeric suffix e.g. OUTER_RACE_1 -> OUTER_RACE)
         base_name = comp_name
         check_name = comp_name.replace(" ", "_").upper()
+        
+        script_file = None
         for standard in script_map:
             if check_name == standard or check_name.startswith(standard + "_"):
-                base_name = standard
+                script_file = script_map[standard]
                 break
-
-        script_file = script_map.get(base_name, "mesh_body.py")
+                
+        # If no standard prefix matched, check for structural patterns
+        if not script_file:
+            if "BOX" in check_name:
+                script_file = "mesh_boxes.py"
+            elif "CANOPY" in check_name:
+                script_file = "mesh_canopies.py"
+            elif "BOTTOM_COVER" in check_name:
+                script_file = "mesh_bottom_cover.py"
+            else:
+                script_file = "mesh_body.py"
         script_path = os.path.join(_ROOT, "mesh_templates", script_file)
         if not os.path.exists(script_path):
             QMessageBox.warning(self, "Mesh Error", f"Mesh script not found: {script_file}")

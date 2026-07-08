@@ -71,7 +71,7 @@ def run(BODY_NAME, config):
   </AdvancedOptions>
  </TetMesher>'''
     simlab.execute(TetMesh)
-    print(f"  OK {mesh_type} direct volume mesh done")
+    print(f"  OK {mesh_type} direct CAD volume mesh done")
 
     # Move to root
     all_models = simlab.getAllRootModelNames("all")

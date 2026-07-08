@@ -14,7 +14,7 @@ def run(BODY_NAME, config):
  </UnitSystem>'''
     simlab.execute(UnitSystem)
 
-    mesh_type = _v('global.mesh_type', 'Tet4')
+    mesh_type = _v('global.mesh_type', 'Tet10')
     tet_type = "Tet4" if mesh_type == "Tet4" else "Tet10StraightEdge"
     mesh_size = _v('global.mesh_size', 4.0)
 
@@ -71,7 +71,7 @@ def run(BODY_NAME, config):
   </AdvancedOptions>
  </TetMesher>'''
     simlab.execute(TetMesh)
-    print(f"  OK {mesh_type} direct volume mesh done")
+    print(f"  OK {mesh_type} direct CAD volume mesh done")
 
     # Move to root
     all_models = simlab.getAllRootModelNames("all")
