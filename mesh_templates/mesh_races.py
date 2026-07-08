@@ -35,11 +35,25 @@ def run(BODY_NAME, config):
     temp_dir = config.get('__temp_dir__', 'C:/temp')
     TARGET_AREA = _v('special.target_area', 527.9)
     TOLERANCE = _v('special.area_tolerance', 10.0)
+    
+    import os
+    import time
+    log_file = os.path.join(os.path.dirname(__file__), "..", "_cache", "meshing_debug.log")
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    
+    def truth_log(msg, force_print=True):
+        if force_print:
+            print(msg)
+        try:
+            with open(log_file, "a") as f:
+                f.write(f"[{time.strftime('%H:%M:%S')}] [{BODY_NAME}] {msg}\n")
+        except:
+            pass
 
-    print("=" * 60)
-    print("  Mesh Workflow - OUTER_RACE, MID_RACE, INNER_RACE")
-    print(f"  Mesh Size: {mesh_size}mm | Type: {mesh_type}")
-    print("=" * 60)
+    truth_log("=" * 60)
+    truth_log(f"Mesh Workflow - OUTER_RACE, MID_RACE, INNER_RACE")
+    truth_log(f"Mesh Size: {mesh_size}mm | Type: {mesh_type}")
+    truth_log("=" * 60)
 
     def apply_isoline(body_name, r_min, r_max, mc_name, axial_size, cir_elems, color="0,255,0,"):
         grp = f"{mc_name}_Faces"
@@ -211,22 +225,47 @@ def run(BODY_NAME, config):
         return next((m for m in all_models if m != MODEL and
                      ("_SM" in m or m.endswith(".gda"))), MODEL)
 
-    def get_bodies_from_mesh(mesh_model, prefix):
-        """Get body names matching prefix from MESH model only."""
-        all_b = simlab.getChildrenInAssembly(mesh_model, mesh_model, "ALLBODIES")
-        return list(dict.fromkeys([b for b in all_b if str(b).startswith(prefix)]))
+    def get_bodies_from_mesh(mesh_model, exact_name):
+        """Get body exactly matching exact_name from MESH model."""
+        try:
+            # Pass a very broad substring to get many bodies, then filter in python
+            # to avoid SimLab throwing a 'Not Found' UI error dialog
+            res = simlab.getBodiesWithSubString(mesh_model, ["BEARING"])
+            return [b for b in res if b == exact_name] if res else []
+        except:
+            return []
 
     # ===============================================================
     # IDENTIFY TARGET BODIES
     # ===============================================================
+    truth_log(f"Starting target body identification for {BODY_NAME}")
     if BODY_NAME.startswith("BEARING_"):
-        # For a full bearing assembly, nodes are sorted: [Outer, Inner, Mid...]
-        # Meaning: _1 is Outer, _2 is Inner, _3+ are Mid races
-        outer_bodies = [f"{BODY_NAME}_1"]
-        inner_bodies = [f"{BODY_NAME}_2"]
-        # We don't know exactly how many mid races there are, but we can assume up to 10 for safety
-        # SimLab's SelectFeatures will just safely ignore bodies that don't exist in the CAD
-        mid_bodies = [f"{BODY_NAME}_{i}" for i in range(3, 12)]
+        # Dynamically fetch existing bodies to prevent SimLab API error dialogs
+        all_bearing_bodies = []
+        try:
+            truth_log(f"Querying SimLab for bodies containing 'BEARING' in {MODEL}")
+            res = simlab.getBodiesWithSubString(MODEL, ["BEARING"])
+            if res:
+                all_bearing_bodies = [b for b in res if str(b).startswith(f"{BODY_NAME}_")]
+                truth_log(f"Found matching bodies: {all_bearing_bodies}")
+            else:
+                truth_log(f"simlab.getBodiesWithSubString returned empty.")
+        except Exception as e:
+            truth_log(f"Exception during getBodiesWithSubString: {e}")
+            
+        outer_bodies = [b for b in all_bearing_bodies if b.endswith("_1")]
+        inner_bodies = [b for b in all_bearing_bodies if b.endswith("_2")]
+        mid_bodies   = [b for b in all_bearing_bodies if b not in outer_bodies and b not in inner_bodies]
+
+        truth_log(f"Classified -> OUTER: {outer_bodies} | INNER: {inner_bodies} | MID: {mid_bodies}")
+
+        # Fallback if API lookup fails or returns nothing
+        if not outer_bodies:
+            outer_bodies = [f"{BODY_NAME}_1"]
+            truth_log(f"Fallback applied for outer_bodies: {outer_bodies}")
+        if not inner_bodies:
+            inner_bodies = [f"{BODY_NAME}_2"]
+            truth_log(f"Fallback applied for inner_bodies: {inner_bodies}")
     else:
         # Fallback for old standalone mappings
         outer_bodies = ["OUTER_RACE", "OUTER_RACE_1"]
@@ -240,44 +279,55 @@ def run(BODY_NAME, config):
     print("  OUTER_RACE")
     print("="*60)
 
-    for body in outer_bodies:
-        print(f"\n  -- Mesh Controls: {body} --")
-        apply_isoline(body, 13.5, 13.6, f"{body}_IsoLine_Inner", 2,   24, "0,255,255,")
-        apply_isoline(body, 17.4, 17.6, f"{body}_IsoLine_Outer", 2.5, 28, "0,255,0,")
+    if outer_bodies:
+        for body in outer_bodies:
+            print(f"\n  -- Mesh Controls: {body} --")
+            apply_isoline(body, 13.5, 13.6, f"{body}_IsoLine_Inner", 2,   24, "0,255,255,")
+            apply_isoline(body, 17.4, 17.6, f"{body}_IsoLine_Outer", 2.5, 28, "0,255,0,")
 
-    print("\n  -- Surface Mesh --")
-    outer_str = "".join(f'"{b}",' for b in outer_bodies)
-    surface_mesh_bodies(outer_str, mesh_size)
-    print("  OK Surface mesh done")
+        print("\n  -- Surface Mesh --")
+        outer_str = "".join(f'"{b}",' for b in outer_bodies)
+        surface_mesh_bodies(outer_str, mesh_size)
+        print("  OK Surface mesh done")
 
-    mesh_model = get_mesh_model()
-    print(f"  Mesh model: {mesh_model}")
+        mesh_model = get_mesh_model()
+        print(f"  Mesh model: {mesh_model}")
 
-    print("\n  -- Quality Cleanup --")
-    quality_cleanup(mesh_model, outer_str)
-    print("  OK Quality cleanup done")
+        print("\n  -- Quality Cleanup --")
+        quality_cleanup(mesh_model, outer_str)
+        print("  OK Quality cleanup done")
 
-    print(f"\n  -- Volume Mesh ({mesh_type}) --")
-    # For volume meshing, only grab bodies that actually got surface meshed
-    # We can rely on prefix search for OUTER_RACE if it was renamed, but since it's dynamic we use original names
-    outer_vm = []
-    for ob in outer_bodies:
-        outer_vm.extend(get_bodies_from_mesh(mesh_model, ob))
-    
-    outer_vm_str = "".join(f'"{b}",' for b in outer_vm)
-    if outer_vm:
-        print(f"  Volume mesh bodies: {outer_vm}")
-        volume_mesh(mesh_model, outer_vm_str, f"{BODY_NAME}_OUTER", mesh_size, mesh_type)
-        print("  OK Volume mesh done")
-
-        print("\n  -- Merge/Rename -> OUTER_RACE --")
-        if len(outer_vm) >= 2:
-            merge_bodies(outer_vm, f"{BODY_NAME}_OUTER", mesh_model)
-        elif len(outer_vm) == 1:
-            rename_body(mesh_model, outer_vm[0], f"{BODY_NAME}_OUTER")
+        print(f"\n  -- Volume Mesh ({mesh_type}) --")
+        # For volume meshing, only grab bodies that actually got surface meshed
+        # We can rely on prefix search for OUTER_RACE if it was renamed, but since it's dynamic we use original names
+        outer_vm = []
+        for ob in outer_bodies:
+            outer_vm.extend(get_bodies_from_mesh(mesh_model, ob))
         
-        print("\n  -- Move to Root --")
-        move_to_root(mesh_model, f"{BODY_NAME}_OUTER")
+        outer_vm_str = "".join(f'"{b}",' for b in outer_vm)
+        if outer_vm:
+            print(f"  Volume mesh bodies: {outer_vm}")
+            volume_mesh(mesh_model, outer_vm_str, f"{BODY_NAME}_OUTER", mesh_size, mesh_type)
+            print("  OK Volume mesh done")
+
+            print("\n  -- Merge/Rename -> OUTER_RACE --")
+            if len(outer_vm) >= 2:
+                merge_bodies(outer_vm, f"{BODY_NAME}_OUTER", mesh_model)
+            elif len(outer_vm) == 1:
+                rename_body(mesh_model, outer_vm[0], f"{BODY_NAME}_OUTER")
+            
+            print("\n  -- Move to Root --")
+            move_to_root(mesh_model, f"{BODY_NAME}_OUTER")
+            
+            # Verify if it actually worked!
+            if get_bodies_from_mesh(MODEL, f"{BODY_NAME}_OUTER"):
+                truth_log(f"SUCCESS: Volume mesh '{BODY_NAME}_OUTER' verified in Root!")
+            else:
+                truth_log(f"ERROR: Volume mesh '{BODY_NAME}_OUTER' SILENTLY FAILED! Not found in Root!")
+        else:
+            truth_log(f"WARNING: Surface mesh for OUTER_RACE produced zero bodies, skipping Volume mesh.")
+    else:
+        truth_log("No OUTER_RACE bodies found in CAD to mesh.")
 
     # ===============================================================
     # MID_RACE
@@ -286,42 +336,53 @@ def run(BODY_NAME, config):
     print("  MID_RACE")
     print("="*60)
 
-    for body in mid_bodies:
-        print(f"\n  -- Mesh Controls: {body} --")
-        apply_isoline(body, 11.4, 11.5, f"{body}_IsoLine_Inner", 2, 20, "0,255,255,")
-        apply_isoline(body, 13.5, 13.6, f"{body}_IsoLine_Outer", 2, 20, "0,255,0,")
+    if mid_bodies:
+        for body in mid_bodies:
+            print(f"\n  -- Mesh Controls: {body} --")
+            apply_isoline(body, 11.4, 11.5, f"{body}_IsoLine_Inner", 2, 20, "0,255,255,")
+            apply_isoline(body, 13.5, 13.6, f"{body}_IsoLine_Outer", 2, 20, "0,255,0,")
 
-    print("\n  -- Surface Mesh --")
-    mid_str = "".join(f'"{b}",' for b in mid_bodies)
-    surface_mesh_bodies(mid_str, mesh_size)
-    print("  OK Surface mesh done")
+        print("\n  -- Surface Mesh --")
+        mid_str = "".join(f'"{b}",' for b in mid_bodies)
+        surface_mesh_bodies(mid_str, mesh_size)
+        print("  OK Surface mesh done")
 
-    mesh_model = get_mesh_model()
-    print(f"  Mesh model: {mesh_model}")
+        mesh_model = get_mesh_model()
+        print(f"  Mesh model: {mesh_model}")
 
-    print("\n  -- Quality Cleanup --")
-    quality_cleanup(mesh_model, mid_str)
-    print("  OK Quality cleanup done")
+        print("\n  -- Quality Cleanup --")
+        quality_cleanup(mesh_model, mid_str)
+        print("  OK Quality cleanup done")
 
-    print(f"\n  -- Volume Mesh ({mesh_type}) --")
-    mid_vm = []
-    for mb in mid_bodies:
-        mid_vm.extend(get_bodies_from_mesh(mesh_model, mb))
+        print(f"\n  -- Volume Mesh ({mesh_type}) --")
+        mid_vm = []
+        for mb in mid_bodies:
+            mid_vm.extend(get_bodies_from_mesh(mesh_model, mb))
 
-    mid_vm_str = "".join(f'"{b}",' for b in mid_vm)
-    if mid_vm:
-        print(f"  Volume mesh bodies: {mid_vm}")
-        volume_mesh(mesh_model, mid_vm_str, f"{BODY_NAME}_MID", mesh_size, mesh_type)
-        print("  OK Volume mesh done")
+        mid_vm_str = "".join(f'"{b}",' for b in mid_vm)
+        if mid_vm:
+            print(f"  Volume mesh bodies: {mid_vm}")
+            volume_mesh(mesh_model, mid_vm_str, f"{BODY_NAME}_MID", mesh_size, mesh_type)
+            print("  OK Volume mesh done")
 
-        print("\n  -- Merge/Rename -> MID_RACE --")
-        if len(mid_vm) >= 2:
-            merge_bodies(mid_vm, f"{BODY_NAME}_MID", mesh_model)
-        elif len(mid_vm) == 1:
-            rename_body(mesh_model, mid_vm[0], f"{BODY_NAME}_MID")
+            print("\n  -- Merge/Rename -> MID_RACE --")
+            if len(mid_vm) >= 2:
+                merge_bodies(mid_vm, f"{BODY_NAME}_MID", mesh_model)
+            elif len(mid_vm) == 1:
+                rename_body(mesh_model, mid_vm[0], f"{BODY_NAME}_MID")
 
-        print("\n  -- Move to Root --")
-        move_to_root(mesh_model, f"{BODY_NAME}_MID")
+            print("\n  -- Move to Root --")
+            move_to_root(mesh_model, f"{BODY_NAME}_MID")
+            
+            # Verify if it actually worked!
+            if get_bodies_from_mesh(MODEL, f"{BODY_NAME}_MID"):
+                truth_log(f"SUCCESS: Volume mesh '{BODY_NAME}_MID' verified in Root!")
+            else:
+                truth_log(f"ERROR: Volume mesh '{BODY_NAME}_MID' SILENTLY FAILED! Not found in Root!")
+        else:
+            truth_log(f"WARNING: Surface mesh for MID_RACE produced zero bodies, skipping Volume mesh.")
+    else:
+        truth_log("No MID_RACE bodies found in CAD to mesh.")
 
     # ===============================================================
     # INNER_RACE
@@ -330,43 +391,54 @@ def run(BODY_NAME, config):
     print("  INNER_RACE")
     print("="*60)
 
-    for body in inner_bodies:
-        print(f"\n  -- Mesh Controls: {body} --")
-        apply_isoline(body, 7.4,  7.6,  f"{body}_IsoLine_Inner", 2.5, 16, "0,255,255,")
-        apply_isoline(body, 11.4, 11.5, f"{body}_IsoLine_Outer", 2,   20, "0,255,0,")
+    if inner_bodies:
+        for body in inner_bodies:
+            print(f"\n  -- Mesh Controls: {body} --")
+            apply_isoline(body, 7.4,  7.6,  f"{body}_IsoLine_Inner", 2.5, 16, "0,255,255,")
+            apply_isoline(body, 11.4, 11.5, f"{body}_IsoLine_Outer", 2,   20, "0,255,0,")
 
-    print("\n  -- Surface Mesh --")
-    inner_str = "".join(f'"{b}",' for b in inner_bodies)
-    surface_mesh_bodies(inner_str, mesh_size)
-    print("  OK Surface mesh done")
+        print("\n  -- Surface Mesh --")
+        inner_str = "".join(f'"{b}",' for b in inner_bodies)
+        surface_mesh_bodies(inner_str, mesh_size)
+        print("  OK Surface mesh done")
 
-    mesh_model = get_mesh_model()
-    print(f"  Mesh model: {mesh_model}")
+        mesh_model = get_mesh_model()
+        print(f"  Mesh model: {mesh_model}")
 
-    print("\n  -- Quality Cleanup --")
-    quality_cleanup(mesh_model, inner_str)
-    print("  OK Quality cleanup done")
+        print("\n  -- Quality Cleanup --")
+        quality_cleanup(mesh_model, inner_str)
+        print("  OK Quality cleanup done")
 
-    print(f"\n  -- Volume Mesh ({mesh_type}) --")
-    inner_vm = []
-    for ib in inner_bodies:
-        inner_vm.extend(get_bodies_from_mesh(mesh_model, ib))
+        print(f"\n  -- Volume Mesh ({mesh_type}) --")
+        inner_vm = []
+        for ib in inner_bodies:
+            inner_vm.extend(get_bodies_from_mesh(mesh_model, ib))
 
-    inner_vm_str = "".join(f'"{b}",' for b in inner_vm)
-    if inner_vm:
-        print(f"  Volume mesh bodies: {inner_vm}")
-        volume_mesh(mesh_model, inner_vm_str, f"{BODY_NAME}_INNER", mesh_size, mesh_type)
-        print("  OK Volume mesh done")
+        inner_vm_str = "".join(f'"{b}",' for b in inner_vm)
+        if inner_vm:
+            print(f"  Volume mesh bodies: {inner_vm}")
+            volume_mesh(mesh_model, inner_vm_str, f"{BODY_NAME}_INNER", mesh_size, mesh_type)
+            print("  OK Volume mesh done")
 
-        print("\n  -- Merge/Rename -> INNER_RACE --")
-        if len(inner_vm) >= 2:
-            merge_bodies(inner_vm, f"{BODY_NAME}_INNER", mesh_model)
-        elif len(inner_vm) == 1:
-            rename_body(mesh_model, inner_vm[0], f"{BODY_NAME}_INNER")
+            print("\n  -- Merge/Rename -> INNER_RACE --")
+            if len(inner_vm) >= 2:
+                merge_bodies(inner_vm, f"{BODY_NAME}_INNER", mesh_model)
+            elif len(inner_vm) == 1:
+                rename_body(mesh_model, inner_vm[0], f"{BODY_NAME}_INNER")
 
-        print("\n  -- Move to Root --")
-        move_to_root(mesh_model, f"{BODY_NAME}_INNER")
+            print("\n  -- Move to Root --")
+            move_to_root(mesh_model, f"{BODY_NAME}_INNER")
+            
+            # Verify if it actually worked!
+            if get_bodies_from_mesh(MODEL, f"{BODY_NAME}_INNER"):
+                truth_log(f"SUCCESS: Volume mesh '{BODY_NAME}_INNER' verified in Root!")
+            else:
+                truth_log(f"ERROR: Volume mesh '{BODY_NAME}_INNER' SILENTLY FAILED! Not found in Root!")
+        else:
+            truth_log(f"WARNING: Surface mesh for INNER_RACE produced zero bodies, skipping Volume mesh.")
+    else:
+        truth_log("No INNER_RACE bodies found in CAD to mesh.")
 
-    print("\n" + "=" * 60)
-    print("  All done - OUTER_RACE, MID_RACE, INNER_RACE meshed")
+    truth_log("=" * 60)
+    truth_log("All done - OUTER_RACE, MID_RACE, INNER_RACE meshed")
     print("=" * 60)

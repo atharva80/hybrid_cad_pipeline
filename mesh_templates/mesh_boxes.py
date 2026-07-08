@@ -32,6 +32,9 @@ def run(BODY_NAME, config):
             MODEL = models[0]
 
     mesh_type = _v('global.mesh_type', 'Hex')
+    # Force Hex for boxes
+    mesh_type = 'Hex'
+    
     mesh_size = _v('global.mesh_size', 4.0)
     vol_mesh_size = _v('global.vol_mesh_size', 4.0)
 
@@ -39,14 +42,14 @@ def run(BODY_NAME, config):
     simlab.execute(f''' <AutoHexMesh UUID="f4ce8a5e-4df8-42de-ab98-547a83e9d7c2">
       <InputBodies>
        <Entities>
-        <Model>{MODEL}</Model>
+        <Model>$Geometry</Model>
         <Body>"{BODY_NAME}",</Body>
        </Entities>
       </InputBodies>
       <AverageElementSize Value="{vol_mesh_size} mm"/>
       <MinimumElementSize Value="{vol_mesh_size*0.1:.3f} mm"/>
       <AllowQuadMeshTransition Checked="0"/>
-      <CreateMeshInNewModel Checked="0"/>
+      <CreateMeshInNewModel Checked="1"/>
       <CreateRingAlongCircleAndSlot Checked="1"/>
       <AvoidSpiderWedgeAlongAxis Checked="0"/>
      </AutoHexMesh>''')
@@ -54,14 +57,14 @@ def run(BODY_NAME, config):
 
     # Get mesh model dynamically
     all_models = simlab.getAllRootModelNames("all")
-    mesh_model = next((m for m in all_models if m != MODEL and
-                       ("_SM" in m or m.endswith(".gda"))), MODEL)
+    mesh_model = next((m for m in all_models if "_SM" in m or m.endswith(".gda")), None)
 
-    print(f"\n-- PHASE 5: Move to Root -----------------------------------")
-    simlab.execute(f'''<MoveSubModelBodiesToRootModel UUID="0619e34b-2275-40b0-b479-882d179d560b">
-      <BodiesToMove><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></BodiesToMove>
-     </MoveSubModelBodiesToRootModel>''')
-    print(f"  OK {BODY_NAME} moved to root of {mesh_model}")
+    if mesh_model:
+        print(f"\n-- PHASE 5: Move to Root -----------------------------------")
+        simlab.execute(f'''<MoveSubModelBodiesToRootModel UUID="0619e34b-2275-40b0-b479-882d179d560b">
+          <BodiesToMove><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></BodiesToMove>
+         </MoveSubModelBodiesToRootModel>''')
+        print(f"  OK {BODY_NAME} moved to root of {mesh_model}")
     
     print(f"\n============================================================")
     print(f"  {BODY_NAME} complete!")

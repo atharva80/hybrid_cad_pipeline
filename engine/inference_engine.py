@@ -348,7 +348,8 @@ def render_results(inference_output: dict, out_dir: str, cad_basename: str):
     results = inference_output["results"]
 
     print(f"\n Rendering identified parts to: {out_dir}")
-    for comp, nodes, _ in results:
+    for item in results:
+        comp, nodes = item[0], item[1]
         if not nodes:
             continue
         try:

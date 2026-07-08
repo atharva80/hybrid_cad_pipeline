@@ -141,7 +141,7 @@ class InferenceWorker(QThread):
                     
                     # Flatten results so that each solid is its own distinct item (e.g. PCB_1, PCB_2)
                     flat_result = []
-                    for res in raw_result:
+                    for res in raw_result.get("results", []):
                         comp = res[0]
                         nodes = res[1]
                         if len([n for n in nodes if n is not None]) > 1:
@@ -152,7 +152,9 @@ class InferenceWorker(QThread):
                                     valid_idx += 1
                         else:
                             flat_result.append(res)
-                    result = flat_result
+                            
+                    raw_result["results"] = flat_result
+                    result = raw_result
 
                     import time; time.sleep(0.05)  # Yield GIL before heavy rendering
 
