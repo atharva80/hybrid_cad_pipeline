@@ -40,6 +40,25 @@ def run(BODY_NAME, config):
     print(f"  Surface: {surf_mesh_size}mm | Volume: {vol_mesh_size}mm | Type: {mesh_type}")
     print("=" * 60)
 
+    # -- ROBUST BODY CHECK --
+    _all_mdls = simlab.getAllRootModelNames("all")
+    _actual_cad = "$Geometry"
+    if _all_mdls:
+        for m in _all_mdls:
+            if not m.endswith(".gda") and "_SM" not in m:
+                _actual_cad = m
+                break
+    _mdl = _actual_cad if "MODEL" not in locals() else MODEL
+    if _mdl == "$Geometry" and _actual_cad != "$Geometry":
+        _mdl = _actual_cad
+        
+    _check_bods = simlab.getBodiesWithSubString(_mdl, [BODY_NAME])
+    if not _check_bods:
+        print(f"WARNING: Body '{BODY_NAME}' does NOT exist in model '{_mdl}'!")
+        print(f"Skipping {BODY_NAME} gracefully to prevent UI freeze.")
+        return
+
+
     # ===============================================================
     # PHASE 1: MESH CONTROLS
     # ===============================================================
@@ -190,7 +209,12 @@ def run(BODY_NAME, config):
     # ===============================================================
     print(f"\n-- PHASE 5: Move to Root -----------------------------------")
     simlab.execute(f'''<MoveSubModelBodiesToRootModel UUID="0619e34b-2275-40b0-b479-882d179d560b">
-      <BodiesToMove><Entities><Model>{mesh_model}</Model><Body>"{BODY_NAME}",</Body></Entities></BodiesToMove>
+      <BodiesToMove>
+       <Entities>
+        <Model>{mesh_model}</Model>
+        <Body>"{BODY_NAME}",</Body>
+       </Entities>
+      </BodiesToMove>
      </MoveSubModelBodiesToRootModel>''')
     print(f"  OK {BODY_NAME} moved to root of {mesh_model}")
 

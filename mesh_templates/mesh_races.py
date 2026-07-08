@@ -228,9 +228,9 @@ def run(BODY_NAME, config):
     def get_bodies_from_mesh(mesh_model, exact_name):
         """Get body exactly matching exact_name from MESH model."""
         try:
-            # Pass a very broad substring to get many bodies, then filter in python
-            # to avoid SimLab throwing a 'Not Found' UI error dialog
-            res = simlab.getBodiesWithSubString(mesh_model, ["BEARING"])
+            # Pass empty string to get ALL bodies in the model, then filter in python
+            # This guarantees SimLab won't throw a 'Not Found' UI error dialog because the model is never empty
+            res = simlab.getBodiesWithSubString(mesh_model, [""])
             return [b for b in res if b == exact_name] if res else []
         except:
             return []
@@ -240,32 +240,11 @@ def run(BODY_NAME, config):
     # ===============================================================
     truth_log(f"Starting target body identification for {BODY_NAME}")
     if BODY_NAME.startswith("BEARING_"):
-        # Dynamically fetch existing bodies to prevent SimLab API error dialogs
-        all_bearing_bodies = []
-        try:
-            truth_log(f"Querying SimLab for bodies containing 'BEARING' in {MODEL}")
-            res = simlab.getBodiesWithSubString(MODEL, ["BEARING"])
-            if res:
-                all_bearing_bodies = [b for b in res if str(b).startswith(f"{BODY_NAME}_")]
-                truth_log(f"Found matching bodies: {all_bearing_bodies}")
-            else:
-                truth_log(f"simlab.getBodiesWithSubString returned empty.")
-        except Exception as e:
-            truth_log(f"Exception during getBodiesWithSubString: {e}")
-            
-        outer_bodies = [b for b in all_bearing_bodies if b.endswith("_1")]
-        inner_bodies = [b for b in all_bearing_bodies if b.endswith("_2")]
-        mid_bodies   = [b for b in all_bearing_bodies if b not in outer_bodies and b not in inner_bodies]
-
-        truth_log(f"Classified -> OUTER: {outer_bodies} | INNER: {inner_bodies} | MID: {mid_bodies}")
-
-        # Fallback if API lookup fails or returns nothing
-        if not outer_bodies:
-            outer_bodies = [f"{BODY_NAME}_1"]
-            truth_log(f"Fallback applied for outer_bodies: {outer_bodies}")
-        if not inner_bodies:
-            inner_bodies = [f"{BODY_NAME}_2"]
-            truth_log(f"Fallback applied for inner_bodies: {inner_bodies}")
+        # User defined fixed mapping: 1=Outer, 2=Inner, 3 & 4 = Mid Races
+        outer_bodies = [f"{BODY_NAME}_1"]
+        inner_bodies = [f"{BODY_NAME}_2"]
+        mid_bodies   = [f"{BODY_NAME}_3", f"{BODY_NAME}_4"]
+        truth_log(f"Strict mapping applied -> OUTER: {outer_bodies} | INNER: {inner_bodies} | MID: {mid_bodies}")
     else:
         # Fallback for old standalone mappings
         outer_bodies = ["OUTER_RACE", "OUTER_RACE_1"]

@@ -144,7 +144,7 @@ class InferenceWorker(QThread):
                     for res in raw_result.get("results", []):
                         comp = res[0]
                         nodes = res[1]
-                        if len([n for n in nodes if n is not None]) > 1:
+                        if len([n for n in nodes if n is not None]) > 1 and not comp.startswith("BEARING_"):
                             valid_idx = 1
                             for n in nodes:
                                 if n is not None:

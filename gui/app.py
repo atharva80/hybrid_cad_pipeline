@@ -1671,17 +1671,24 @@ simlab.execute(STEP_Import)
                 QMessageBox.warning(self, "API Error",
                     "SimLab API listener is not running!\n"
                     "Click the 'ATLAS API' button in SimLab first.")
+                return False
             except socket.timeout:
                 QMessageBox.warning(self, "API Error",
                     "Connection to SimLab API timed out!\n"
                     "Please close SimLab, restart it, and click 'ATLAS API' again.")
+                return False
         except Exception as e:
             QMessageBox.critical(self, "Mesh Error", f"Failed to dispatch mesh script: {e}")
+            return False
+        
+        return True
 
     def _handle_mesh_all(self, jobs):
         """Dispatch all components using their saved JSON default configs."""
         for comp_name, config in jobs:
-            self._handle_mesh(comp_name, config)
+            success = self._handle_mesh(comp_name, config)
+            if success is False:
+                break
             import time
             time.sleep(0.1)
         self.progress_lbl.setText("Dispatched all mesh jobs")
@@ -1709,15 +1716,22 @@ simlab.execute(STEP_Import)
                 QMessageBox.warning(self, "API Error",
                     "SimLab API listener is not running!\n"
                     "Click the 'ATLAS API' button in SimLab first.")
+                return False
             except socket.timeout:
                 QMessageBox.warning(self, "API Error",
                     "Connection to SimLab API timed out!")
+                return False
         except Exception as e:
             QMessageBox.critical(self, "Contact Error", f"Failed to dispatch contact script: {e}")
+            return False
+            
+        return True
 
     def _handle_contact_all(self, jobs):
         for contact_name, config in jobs:
-            self._handle_contact(contact_name, config)
+            success = self._handle_contact(contact_name, config)
+            if success is False:
+                break
             import time
             time.sleep(0.1)
         self.progress_lbl.setText("Dispatched all contact jobs")
