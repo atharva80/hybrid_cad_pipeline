@@ -37,6 +37,22 @@ def run(BODY_NAME, config):
         else:
             MODEL = models[0]
 
+    # -- ROBUST BODY CHECK & EXPANSION --
+    master_bods = simlab.getBodiesWithSubString(MODEL, [master])
+    if not master_bods:
+        print(f"WARNING: Master body '{master}' does NOT exist in model '{MODEL}'!")
+        print(f"Skipping contact '{BODY_NAME}' gracefully to prevent UI freeze.")
+        return
+        
+    slave_bods = simlab.getBodiesWithSubString(MODEL, [slave])
+    if not slave_bods:
+        print(f"WARNING: Slave body '{slave}' does NOT exist in model '{MODEL}'!")
+        print(f"Skipping contact '{BODY_NAME}' gracefully to prevent UI freeze.")
+        return
+
+    master_xml = ",".join([f'"{b}"' for b in master_bods]) + ","
+    slave_xml = ",".join([f'"{b}"' for b in slave_bods]) + ","
+
     DefineManualContact=f''' <Contact BCType="Contact" CheckBox="ON" UUID="3b4a24b5-6aea-49d3-b74a-82bf5b3ec193" customselection="1" isObject="2" pixmap="sizemeshcontrol">
   <tag Value="-1"/>
   <Name Value="{BODY_NAME}"/>
@@ -45,13 +61,13 @@ def run(BODY_NAME, config):
   <MasterEntity>
    <Entities>
     <Model>{MODEL}</Model>
-    <Body>"{master}",</Body>
+    <Body>{master_xml}</Body>
    </Entities>
   </MasterEntity>
   <SlaveEntity>
    <Entities>
     <Model>{MODEL}</Model>
-    <Body>"{slave}",</Body>
+    <Body>{slave_xml}</Body>
    </Entities>
   </SlaveEntity>
   <IgnoreEdges/>
