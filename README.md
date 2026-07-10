@@ -1,78 +1,60 @@
-# Hybrid CAD Parsing Pipeline
+# ATLAS: Hybrid CAD Parsing & Meshing Pipeline
 
-This directory contains the inference engine for the Hybrid CAD Parsing Pipeline. It processes unlabelled CAD assemblies (.STEP format), isolates the Stator and Shaft using geometric heuristics, and applies an XGBoost model to classify surrounding components (Covers, Rotors, Bearings, PCBs, EPS Packaging, Canopies, etc.).
+ATLAS is a comprehensive Machine Learning and CAD processing application designed to automate the classification, parsing, and live meshing of motor assemblies in Altair SimLab.
 
-Outputs:
-1. **Rendered PNGs**: A 3D render of each identified component.
-2. **Flattened Labeled CAD**: A `{Original_Name}_NAMED.step` file with a flattened assembly structure, where solids are renamed to their classified component names (e.g., `STATOR`, `TOP_COVER`, `Solid_1`).
+It processes unlabelled CAD assemblies (.STEP format), isolates key components using geometric heuristics, classifies them using an XGBoost model, and communicates directly with Altair SimLab via a TCP socket to automate surface/volume meshing and contact generation.
 
 ---
 
-## Setup Instructions (Windows)
+## Windows Installation & Setup Guide
 
-Due to dependencies on C++ CAD libraries, this project requires Conda. Standard pip installations for `pythonocc-core` are generally not supported on Windows.
+Since this pipeline requires OpenCASCADE (C++) for CAD parsing and communicates with Altair SimLab for meshing, please follow these steps carefully on a Windows machine.
 
-### 1. Install Conda
-Install [Miniconda for Windows](https://docs.conda.io/en/latest/miniconda.html) if not already available on your system.
+### Prerequisites
+1. **Altair SimLab 2025.1** (or compatible newer version) installed.
+2. **Miniconda** (or Anaconda) installed.
 
-### 2. Create the Environment
-Open the Anaconda Prompt, navigate to the project directory, and create the environment:
+### Step 1: Install the Conda Environment
+Open your **Anaconda Prompt** as Administrator, navigate to the project directory, and create the environment:
 
 ```cmd
 cd path\to\hybrid_cad_pipeline
 conda env create -f config/environment.yml
 ```
-This process downloads OpenCASCADE, PyVista, XGBoost, and other required packages.
+*(Note: Standard `pip` installations for `pythonocc-core` are not supported on Windows. You must use Conda.)*
 
-### 3. Activate the Environment
-The environment must be activated before running any scripts:
+### Step 2: Launch the SimLab API Server
+ATLAS communicates with SimLab using an internal IPC (Inter-Process Communication) socket.
+1. Open **Altair SimLab 2025.1**.
+2. Go to the **Advanced** tab in the top ribbon.
+3. Click **Play** (or `Play Script`).
+4. Browse to your `hybrid_cad_pipeline` folder and select **`simlab_api_server.py`**.
+5. The SimLab console will print: `ATLAS IPC Bridge Active. Listening on localhost:5050`. Leave SimLab open.
+
+### Step 3: Launch the ATLAS Interface
+Go back to your Anaconda Prompt. Activate the environment and run the GUI entry point:
+
 ```cmd
 conda activate cv_datagen
+python gui/main.py
 ```
 
 ---
 
-## Usage
+## Usage Workflow
 
-The `main.py` script serves as the primary entry point. It requires one input path (`--in`) and at least one output argument (`--imgs` or `--out`).
-
-### 1. Process a Single File
-Run the pipeline on a single STEP file, generate PNG renders, and export the labeled STEP file:
-```cmd
-python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders --out .\output_cads
-```
-
-### 2. Process a Directory (Batch Mode)
-Run the pipeline on all STEP files within a specified directory by adding the `--batch` flag.
-Note: When using `--imgs` in batch mode, renders are grouped into sub-folders automatically named after each assembly.
-```cmd
-python main.py --batch --in "C:\path\to\CAD_Folder" --imgs .\output_renders --out .\output_cads
-```
-
-### 3. Target the PCB Box
-If the CAD model contains a secondary enclosing top PCB box, use the `--box` modifier flag to trigger explicit heuristic searching for it:
-```cmd
-python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders --box
-```
-
-### 4. Generate Images Only
-Process a file and output only visual renders without exporting a new STEP file:
-```cmd
-python main.py --in "C:\path\to\Motor.STEP" --imgs .\output_renders
-```
-
-### 5. Explainability / Debugging
-To debug misclassifications or analyze feature importance, generate SHAP plots for the trained models:
-```cmd
-python main.py --explain
-```
+1. **Import & Process:** In the ATLAS "Component Identification" tab, browse for a raw `.STEP` file. Click "Process / Import".
+2. **Review & Edit:** Review the identified components. Manually tweak tags or remove unwanted bodies if needed.
+3. **Automated Meshing:** Switch to the "Meshing" tab. Mesh individual components or hit "Mesh All". ATLAS will dispatch meshing macros to SimLab instantly.
+4. **Define Contacts:** Switch to the "Contacts" tab. Verify suggested contacts and tolerances, then hit "Create All Contacts" to apply them in SimLab.
 
 ---
 
-## Directory Structure
-*   `main.py` — Primary CLI script.
-*   `config/environment.yml` — Conda environment and dependency configurations.
-*   `core/` — OpenCASCADE topology extractors (`step_loader.py`).
-*   `heuristics/` — Mathematical rule sets for filtering component candidates (Phases 1-6).
-*   `engine/` — Inference logic (`inference_engine.py`) and CAD export/flattening tools (`step_exporter.py`).
-*   `models/` — Trained XGBoost model weights (.json files).
+## Architecture
+
+- `gui/main.py` — The core ATLAS PySide6 desktop application.
+- `simlab_api_server.py` — The TCP socket listener running inside SimLab's Python environment.
+- `mesh_templates/` — Granular meshing scripts injected dynamically into SimLab.
+- `contact_templates/` — Automated contact creation logic.
+- `config/contact_config/default_contacts.json` — Logic file defining which components should mate.
+- `heuristics/` & `engine/` — Mathematical rule sets and XGBoost inference logic.

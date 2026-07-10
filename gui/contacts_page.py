@@ -109,12 +109,22 @@ class ContactsPage(QWidget):
         self.config_panel.hide()
         root_layout.addWidget(self.config_panel)
 
+    def _ui_name(self, raw_name):
+        name = raw_name
+        if "BEARING" in name:
+            name = name.replace("_1", " (OUTER RACE)")
+            name = name.replace("_2", " (INNER RACE)")
+            name = name.replace("_3", " (MID RACE)")
+            name = name.replace("_4", " (MID RACE 2)")
+        return name.replace("_", " ")
+
     def populate(self, components):
         self._available_comps = components
         self.c_master.clear()
         self.c_slave.clear()
-        self.c_master.addItems(components)
-        self.c_slave.addItems(components)
+        for c in components:
+            self.c_master.addItem(self._ui_name(c), c)
+            self.c_slave.addItem(self._ui_name(c), c)
         
         # Build suggested pairs
         self._suggested_pairs = []
@@ -141,8 +151,8 @@ class ContactsPage(QWidget):
         self._refresh_table()
 
     def _add_custom(self):
-        master = self.c_master.currentText()
-        slave = self.c_slave.currentText()
+        master = self.c_master.currentData()
+        slave = self.c_slave.currentData()
         if not master or not slave or master == slave: return
         
         contact_id = f"CUSTOM_{master}_TO_{slave}"
@@ -165,8 +175,8 @@ class ContactsPage(QWidget):
             item.setData(Qt.UserRole, (c_id, cfg))
             self.table.setItem(row, 0, item)
             
-            self.table.setItem(row, 1, QTableWidgetItem(cfg["master"]))
-            self.table.setItem(row, 2, QTableWidgetItem(cfg["slave"]))
+            self.table.setItem(row, 1, QTableWidgetItem(self._ui_name(cfg["master"])))
+            self.table.setItem(row, 2, QTableWidgetItem(self._ui_name(cfg["slave"])))
             self.table.setItem(row, 3, QTableWidgetItem(cfg["contact_type"]))
             
             btn_container = QWidget()

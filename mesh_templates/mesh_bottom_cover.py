@@ -64,44 +64,17 @@ def run(BODY_NAME, config):
     # ===============================================================
     print("\n-- PHASE 1: Mesh Controls ----------------------------------")
 
-    print(f"\n[MC1] Logo Removal...")
-    simlab.execute(f'''<SelectFeatures UUID="CF82E8FB-9B3E-4c02-BA93-9466C1342C6E" CheckBox="ON">
-      <SupportEntities><Entities><Model>{MODEL}</Model><Body>"{BODY_NAME}",</Body></Entities></SupportEntities>
-      <Arcs MinValue="" MaxValue="" Value=""/><ArcsAll Value=""/>
-      <Circles MinValue="" MaxValue="" Value=""/><CirclesAll Value=""/>
-      <Cones MinValue="" MaxValue="" Value=""/><ConeAll Value=""/>
-      <FullCone Value=""/><ClosedPartialCone Value=""/><OpenPartialCone Value=""/>
-      <TaperAngle Angle="" Value=""/>
-      <Dics MinValue="" MaxValue="" Value=""/><DicsAll Value=""/>
-      <HollowDics MinValue="" MaxValue="" Value=""/><HollowDicsAll Value=""/>
-      <Cylinders MinValue="" MaxValue="" Value=""/><CylindersAll Value=""/>
-      <FullCylinder Value=""/><ClosedPartialCylinder Value=""/><OpenPartialCylinder Value=""/>
-      <Fillets MinValue="" MaxValue="" Value=""/><FilletsOption Value=""/>
-      <PlanarFaces Value=""/><FourEdgedFaces Value=""/><ConnectedCoaxialFaces Value=""/>
-      <ThroughBoltHole MinValue="" MaxValue="" Value=""/>
-      <BlindBoltHole MinValue="" MaxValue="" Value=""/>
-      <BlindBoltHoleDepth MinValue="" MaxValue="" Value=""/>
-      <SlotEdges MinValue="" MaxValue="" Value=""/><SlotEdgesAll Value=""/>
-      <ArcLengthBased Value=""/><AngleBased Value=""/>
-      <SharpEdges Angle="" Option="" Value=""/><ThicknessBased Value="1"/>
-      <LogosAndDetails Value="1"/><LogosAndDetailsThickness Value="2 mm"/>
-      <CreateGrp Value="1" Name="{BODY_NAME}_Logo_Faces"/>
-     </SelectFeatures>''')
-    logo_faces = simlab.getSelectedEntities("Face")
-    print(f"  Logo faces: {len(logo_faces) if logo_faces else 0}")
-    if logo_faces:
-        simlab.execute(f'''<MeshControl UUID="1cb8a11b-39b0-417e-80b5-fa99a34ce8d3" isObject="1" CheckBox="ON">
-      <tag Value="-1"/>
-      <MeshControlName Value="{BODY_NAME}_LogoRemoval"/>
-      <MeshControlType Value="Defeature Logo"/>
-      <Entities><Group>"{BODY_NAME}_Logo_Faces",</Group></Entities>
-      <Reverse ModelIds="" Value="" EntityTypes=""/>
-      <MeshColor Value="255,206,0,"/>
-      <RemoveLogo/>
-     </MeshControl>''')
-        print("  OK Logo Removal MC applied")
-    else:
-        print("  - No logo faces found")
+    # print(f"\n[MC1] Logo Removal...")
+    # simlab.execute(f'''<SelectFeatures UUID="CF82E8FB-9B3E-4c02-BA93-9466C1342C6E" CheckBox="ON">
+    #   <SupportEntities><Entities><Model>{MODEL}</Model><Body>"{BODY_NAME}",</Body></Entities></SupportEntities>
+    #   <ThicknessBased Value="1"/>
+    #   <LogosAndDetails Value="1"/><LogosAndDetailsThickness Value="2 mm"/>
+    #   <CreateGrp Value="1" Name="{BODY_NAME}_Logo_Faces"/>
+    #  </SelectFeatures>''')
+    # logo_faces = simlab.getSelectedEntities("Face")
+    # if logo_faces:
+    #     pass
+    print("  Skipping Logo Defeaturing to prevent Parasolid bottleneck on complex castings")
 
     # ===============================================================
     # PHASE 2: SURFACE MESH

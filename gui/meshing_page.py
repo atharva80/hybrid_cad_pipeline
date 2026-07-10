@@ -380,7 +380,9 @@ class MeshingPage(QWidget):
                 groups["Bearings"].append(c)
             elif "CANOPY" in cu:
                 groups["Canopies"].append(c)
-            elif "BOX" in cu and "PCB" not in cu:
+            elif "PCB_BOX" in cu:
+                standalone.append(c)
+            elif "BOX" in cu:
                 groups["Boxes"].append(c)
             elif "EPS" in cu:
                 groups["EPS Packaging"].append(c)
@@ -388,6 +390,8 @@ class MeshingPage(QWidget):
                 groups["Insulators"].append(c)
             elif "BOTTOM_COVER" in cu:
                 groups["Bottom Covers"].append(c)
+            elif "PCB_BRACKET" in cu:
+                standalone.append(c)
             elif "PCB" in cu:
                 groups["PCBs"].append(c)
             else:

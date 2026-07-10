@@ -1,0 +1,43 @@
+{
+  "component": "PCB_BOX",
+  "script": "mesh_pcb_box",
+  "description": "Complete mesh workflow for PCB_BOX components",
+  "global": {
+    "surf_mesh_size": { "value": 3.0,   "unit": "mm", "min": 0.5, "max": 20.0, "label": "Surface Mesh Size" },
+    "vol_mesh_size":  { "value": 3.0,   "unit": "mm", "min": 0.5, "max": 20.0, "label": "Volume Mesh Size" },
+    "mesh_type":      { "value": "Tet4", "options": ["Tet4", "Tet10"], "label": "Element Type" }
+  },
+  "mesh_controls": [
+    {
+      "name": "PCB_BOX_IsoLine_Small",
+      "type": "IsoLine_Cylinder",
+      "label": "Small Cylinders",
+      "params": {
+        "r_min":      { "value": 1.5,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 1.8,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 0.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 8,    "unit": "count", "label": "Circumferential Elements" }
+      }
+    },
+    {
+      "name": "PCB_BOX_IsoLine_Medium",
+      "type": "IsoLine_Cylinder",
+      "label": "Medium Cylinders",
+      "params": {
+        "r_min":      { "value": 7.0,  "unit": "mm",    "label": "Radius Min" },
+        "r_max":      { "value": 8.0,  "unit": "mm",    "label": "Radius Max" },
+        "axial_size": { "value": 3.0,  "unit": "mm",    "label": "Axial Element Size" },
+        "cir_elems":  { "value": 16,   "unit": "count", "label": "Circumferential Elements" }
+      }
+    }
+  ],
+  "quality": {
+    "aspect_ratio_limit": { "value": 10.0, "label": "Max Aspect Ratio" },
+    "min_edge_length":    { "value": 0.25, "unit": "mm", "label": "Min Edge Length" },
+    "min_height":         { "value": 0.2,  "unit": "mm", "label": "Min Element Height" }
+  },
+  "volume": {
+    "internal_grading": { "value": 2.0,  "label": "Internal Grading" },
+    "min_quality":      { "value": 0.12, "label": "Min Tet Quality" }
+  }
+}

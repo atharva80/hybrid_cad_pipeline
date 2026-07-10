@@ -44,6 +44,7 @@ _COMP_CONFIG_MAP = {
     "EPS_PACKAGING":"mesh_EPS",
     "BEARING_TOP":  "mesh_races",
     "BEARING_BOTTOM":"mesh_races",
+    "PCB_BOX":      "mesh_pcb_box",
 }
 
 
