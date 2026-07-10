@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Parameters>
+<Description>
+		<SimLab>2025.1</SimLab>
+		<Date>2026-7-10</Date>
+		<Time>7:13:36</Time>
+</Description>
+	<Parameter>
+		<Name>Geometry</Name>
+		<Type>String</Type>
+		<Value>seagull_motor_box_named_paratr.x_t</Value>
+	</Parameter>
+	<Parameter>
+		<Name>ImportSlbPath</Name>
+		<Type>String</Type>
+		<Value>F:/02.CAE/ATHARVA/hybrid_cad_pipeline/CAD/manish/seagull_meshed_contacts.slb</Value>
+	</Parameter>
+</Parameters>

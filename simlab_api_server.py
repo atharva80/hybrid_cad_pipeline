@@ -15,7 +15,7 @@ job_queue = queue.Queue()
 def api_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(('127.0.0.1', 5050))
+    server.bind(('127.0.0.1', 5051))
     server.listen(100)
     while True:
         try:
@@ -64,7 +64,7 @@ class LiveMeshBadge(tk.Tk):
         lbl_title = tk.Label(inner, text="ATLAS IPC Bridge Active", font=("Segoe UI", 9, "bold"), fg="#333333", bg="#FFFFFF")
         lbl_title.place(x=36, y=11)
         
-        self.lbl_status = tk.Label(inner, text="Listening on localhost:5050", font=("Segoe UI", 8), fg="#666666", bg="#FFFFFF")
+        self.lbl_status = tk.Label(inner, text="Listening on localhost:5051", font=("Segoe UI", 8), fg="#666666", bg="#FFFFFF")
         self.lbl_status.place(x=36, y=31)
         
         # Interactive Close Button (removed cursor property for SimLab compatibility)
@@ -141,6 +141,97 @@ importlib.reload({module_name})
 
 CONFIG = {repr(config)}
 {module_name}.run("{contact_name}", CONFIG)
+"""
+                elif task_type == "isolate":
+                    comp_name = job.get("component")
+                    self.log(f"Isolating component: {comp_name}")
+                    print(f"[SimLab API Debug] Received Isolate command for: {comp_name}")
+                    code = f"""from hwx import simlab
+print(f"[SimLab API Debug] Executing Isolate Macro for {comp_name}...")
+try:
+    models = simlab.getAllRootModelNames('all')
+    
+    # 1. Hide everything
+    for m in models:
+        try:
+            bodies = simlab.getBodiesWithSubString(m, ["*"])
+            if bodies:
+                simlab.showOrHideEntities(bodies, "Hide", m)
+        except: pass
+        
+    # 2. Show only the target component
+    isolated = False
+    for m in models:
+        try:
+            simlab.showOrHideEntities(["{comp_name}"], "Show", m)
+            print(f"[SimLab API Debug] Isolated in model: {{m}}")
+            isolated = True
+        except: pass
+        
+    if not isolated:
+        # Fallback without model name
+        simlab.showOrHideEntities(["{comp_name}"], "Show")
+        print("[SimLab API Debug] Isolated without model name.")
+        
+except Exception as e:
+    print("Isolate Error:", e)
+"""
+                elif task_type == "bolting":
+                    config = job.get("config", {})
+                    self.log(f"Generating bolts with config: {config}")
+                    print(f"[SimLab API Debug] Received Bolting command with config: {config}")
+                    code = f"""from hwx import simlab
+print("[SimLab API Debug] Executing Bolting Macro...")
+edges = simlab.getSelectedEntities("Edge")
+config = {repr(config)}
+rev = config.get("Reverse", False)
+mesh_size = config.get("Mesh Size", "2.0")
+circ_elems = config.get("Circum. Elems", "8")
+d1 = config.get("D1 (Head Dia)", "6.0")
+d2 = config.get("D2 (Shaft Dia)", "3.0")
+l1 = config.get("L1 (Head Ht)", "2.0")
+l2 = config.get("L2 (Total Len)", "12.0")
+l5 = config.get("L5 (Shaft upper)", "10.0")
+
+if edges:
+    for i, edge in enumerate(edges):
+        try:
+            # Note: getArcEdgeAttributes or simlab.getEdgeCoordinates might be needed,
+            # but usually getArcEdgeProperties exists. We fallback if needed.
+            props = simlab.getArcEdgeProperties(edge)
+            if props:
+                cx, cy, cz = props[0]
+                nx, ny, nz = props[1]
+                if rev:
+                    nx, ny, nz = -nx, -ny, -nz
+                
+                px_str = f"{{cx}} mm,{{cy}} mm,{{cz}} mm"
+                vx_str = f"{{nx}} mm,{{ny}} mm,{{nz}} mm"
+                
+                macro = f'''<HexBolt UUID="17e5a77d-8b12-4228-bae9-59fc362fefaf">
+  <tag Value="-1"/>
+  <Pattern Name="Pattern{{i}}" type="group">
+   <ElementType Index="1" Value="Tet" key="ELEMTYPE" type="enum"/>
+   <MeshSize Value="{{mesh_size}} mm" key="MESHSIZE"/>
+   <AngularDivisions Index="1" Value="{{circ_elems}}" key="ANGULAR_DIV" type="enum"/>
+   <Hex_Head Value="0"/>
+   <Angle Value="360 deg" key="ANGLE" type="enum"/>
+   <P_XYZ Value="{{px_str}}" key="P_X" type="double"/>
+   <V_XYZ Value="{{vx_str}}" key="V_X" type="double"/>
+   <PivotPointLocation Value="Below Head" key="HEAD_TYP" type="enum"/>
+   <InputOption Value="1" key="INPUT_OPTION" name="InputOption" type="enum"/>
+   <Parameters>
+    <D1 Value="{{d1}} mm"/>
+    <D2 Value="{{d2}} mm"/>
+    <L1 Value="{{l1}} mm"/>
+    <L2 Value="{{l2}} mm"/>
+    <L5 Value="{{l5}} mm"/>
+   </Parameters>
+  </Pattern>
+ </HexBolt>'''
+                simlab.execute(macro)
+        except Exception as e:
+            print("Bolt gen error:", e)
 """
                 else:
                     script_name = job.get("script_name")

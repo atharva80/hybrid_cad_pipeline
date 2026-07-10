@@ -14,6 +14,7 @@ from gui.styles import C, SS, COMPONENT_COLORS, ML_COMPONENTS
 from gui.worker import InferenceWorker
 from gui.meshing_page import MeshingPage
 from gui.contacts_page import ContactsPage
+from gui.bolting_page import BoltingPage
 
 # ── Segmented nav button ───────────────────────────────────────────────────
 class NavBtn(QPushButton):
@@ -960,9 +961,11 @@ class App(QMainWindow):
         self.results_page = ResultsPage()
         self.meshing_page = MeshingPage()
         self.contacts_page = ContactsPage()
-        for p in [self.import_page, self.results_page, self.meshing_page, self.contacts_page]: self._pages_w.addWidget(p)
+        self.bolting_page = BoltingPage()
+        
+        for p in [self.import_page, self.results_page, self.meshing_page, self.contacts_page, self.bolting_page]: self._pages_w.addWidget(p)
 
-        for i, label in enumerate(["Import", "Results", "Meshing", "Contacts"]):
+        for i, label in enumerate(["Import", "Results", "Meshing", "Contacts", "Bolting"]):
             btn = NavBtn(label)
             btn.clicked.connect(lambda _, idx=i: self._switch_page(idx))
             nav_layout.addWidget(btn)
@@ -1512,8 +1515,10 @@ simlab.execute(STEP_Import)
             renders = self.results_page._renders_map.get(filename, {})
             self.meshing_page.populate(comps, session_dir, renders)
             self.contacts_page.populate(comps)
+            self.bolting_page.populate(comps)
             self._nav_btns[2].show()
             self._nav_btns[3].show()
+            self._nav_btns[4].show()
             self._switch_page(2)
 
             # Show instruction message box (non-blocking if we prefer, but for now just show it after tab switch)
@@ -1542,9 +1547,11 @@ simlab.execute(STEP_Import)
         
         self.meshing_page.populate(comps, session_dir, renders)
         self.contacts_page.populate(comps)
+        self.bolting_page.populate(comps)
         
         self._nav_btns[2].show()
         self._nav_btns[3].show()
+        self._nav_btns[4].show()
         self._switch_page(2)
 
     def _load_run(self):
@@ -1709,7 +1716,7 @@ simlab.execute(STEP_Import)
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.settimeout(5.0)
-                s.connect(('127.0.0.1', 5050))
+                s.connect(('127.0.0.1', 5051))
                 s.sendall(payload.encode('utf-8'))
                 s.close()
                 self.progress_lbl.setText(f"API: Dispatched contact job for {contact_name}")
@@ -1727,6 +1734,32 @@ simlab.execute(STEP_Import)
             return False
             
         return True
+
+    def _handle_isolate(self, comp_name: str):
+        try:
+            import socket, json
+            payload = json.dumps({"task_type": "isolate", "component": comp_name})
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(5.0)
+            s.connect(('127.0.0.1', 5051))
+            s.sendall(payload.encode('utf-8'))
+            s.close()
+            self.progress_lbl.setText(f"API: Isolating {comp_name}")
+        except Exception as e:
+            QMessageBox.critical(self, "API Error", f"Failed to isolate: {e}")
+
+    def _handle_generate_bolts(self, config: dict):
+        try:
+            import socket, json
+            payload = json.dumps({"task_type": "bolting", "config": config})
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(5.0)
+            s.connect(('127.0.0.1', 5051))
+            s.sendall(payload.encode('utf-8'))
+            s.close()
+            self.progress_lbl.setText(f"API: Generating Bolts")
+        except Exception as e:
+            QMessageBox.critical(self, "API Error", f"Failed to generate bolts: {e}")
 
     def _handle_contact_all(self, jobs):
         for contact_name, config in jobs:
